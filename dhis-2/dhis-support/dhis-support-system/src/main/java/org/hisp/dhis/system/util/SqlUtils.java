@@ -134,12 +134,27 @@ public class SqlUtils {
   }
 
   /**
+   * Cast the given expression to numeric (cast(X as numeric).
+   *
+   * <p>See {@link <a
+   * href="https://www.postgresql.org/docs/current/sql-expressions.html#SQL-SYNTAX-TYPE-CASTS">PostgreSQL
+   * type casts</a>}
+   *
+   * @param expression the expression to cast
+   * @param type the target type to cast the expression to
+   * @return the type cast expression string
+   */
+  public static String cast(String expression, String type) {
+    return "cast (" + expression + " as " + type + ")";
+  }
+
+  /**
    * Cast the given value to numeric (cast(X as numeric).
    *
    * @param value the value.
    * @return a string with the numeric cast statement.
    */
-  public static String castToNumber(String value) {
+  public static String castToNumeric(String value) {
     return "cast (" + value + " as numeric)";
   }
 

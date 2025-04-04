@@ -30,7 +30,6 @@
 package org.hisp.dhis.tracker.export.event;
 
 import static java.util.Map.entry;
-import static org.hisp.dhis.system.util.SqlUtils.castToNumber;
 import static org.hisp.dhis.system.util.SqlUtils.lower;
 import static org.hisp.dhis.system.util.SqlUtils.quote;
 
@@ -54,6 +53,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.hisp.dhis.attribute.AttributeValues;
@@ -64,6 +64,8 @@ import org.hisp.dhis.common.IdentifiableObjectManager;
 import org.hisp.dhis.common.QueryFilter;
 import org.hisp.dhis.common.QueryOperator;
 import org.hisp.dhis.common.UID;
+import org.hisp.dhis.common.ValueType;
+import org.hisp.dhis.common.ValueType.SqlType;
 import org.hisp.dhis.common.collection.CollectionUtils;
 import org.hisp.dhis.commons.util.SqlHelper;
 import org.hisp.dhis.dataelement.DataElement;
@@ -83,6 +85,7 @@ import org.hisp.dhis.program.ProgramStage;
 import org.hisp.dhis.program.ProgramType;
 import org.hisp.dhis.query.JpaQueryUtils;
 import org.hisp.dhis.security.acl.AclService;
+import org.hisp.dhis.system.util.SqlUtils;
 import org.hisp.dhis.trackedentity.TrackedEntity;
 import org.hisp.dhis.trackedentity.TrackedEntityAttribute;
 import org.hisp.dhis.tracker.Page;
@@ -135,8 +138,6 @@ class JdbcEventStore {
   private static final String EVENT_LASTUPDATED_GT = " ev.lastupdated >= ";
 
   private static final String SPACE = " ";
-
-  private static final String EQUALS = " = ";
 
   private static final String AND = " AND ";
 
@@ -612,66 +613,77 @@ left join dataelement de on de.uid = eventdatavalue.dataelement_uid
     for (Entry<TrackedEntityAttribute, List<QueryFilter>> queryItem :
         params.getAttributes().entrySet()) {
       TrackedEntityAttribute tea = queryItem.getKey();
-      String teaUid = tea.getUid();
 
+      // TODO(ivo) why do we append 'AND ' even if the filter query might be ''?
+      // the signature is odd. we return the SQL string but pass in the sql parameters. Either only
+      // return or only capture
       fromBuilder
           .append(hlp.whereAnd())
           .append(" TE.trackedentityid is not null ") // filters out results from event programs
           .append(AND)
           .append(SPACE)
-          .append(
-              getAttributeFilterQuery(
-                  mapSqlParameterSource,
-                  queryItem.getValue(),
-                  teaUid,
-                  tea.getValueType().isNumeric()));
+          .append(getAttributeFilterQuery(queryItem.getValue(), mapSqlParameterSource, tea));
     }
     return fromBuilder.toString();
   }
 
+  @SneakyThrows
   private String getAttributeFilterQuery(
-      MapSqlParameterSource mapSqlParameterSource,
       List<QueryFilter> filters,
-      String teaUid,
-      boolean isNumericTea) {
-    String teaValueCol = quote(teaUid);
+      MapSqlParameterSource mapSqlParameterSource,
+      TrackedEntityAttribute tea) {
     if (filters.isEmpty()) {
       return "";
     }
 
+    String teaUid = tea.getUid();
+    String teaValueCol = quote(teaUid) + ".value";
+    boolean isNumericValueType = tea.getValueType().isNumeric();
+
+    // TODO(ivo) what is the difference between this and filtering on eventdatavalues? if most is the same make this reusable
+    // TODO(ivo) why don't we use one single builder?
+    // where lower("lw1SqmMlnfh".value) like '%8'
+    // where cast ("lw1SqmMlnfh".value as numeric) in (:parameter_2)
+    // where cast ("lw1SqmMlnfh".value as integer) in (:parameter_2)
     StringBuilder query = new StringBuilder();
     List<String> filterStrings = new ArrayList<>();
 
     for (int i = 0; i < filters.size(); i++) {
       QueryFilter filter = filters.get(i);
-      final String queryCol =
-          isNumericTea ? castToNumber(teaValueCol + ".value") : lower(teaValueCol + ".value");
-      int itemType = isNumericTea ? Types.NUMERIC : Types.VARCHAR;
-      String parameterKey = "attributeFilter_%s_%d".formatted(teaUid, i);
+      if (filter.getOperator().isUnary()) {
+        // lower() is not necessarily needed for unary operators but this will allow the DB to use
+        // the index on lower(teav.value)
+        filterStrings.add(lower(teaValueCol) + SPACE + filter.getSqlOperator() + SPACE);
+      } else if (isNumericValueType && filter.getOperator().isCast()) {
+        SqlType sqlType = ValueType.JAVA_TO_SQL_TYPES.get(tea.getValueType().getJavaClass());
+        String valueColOperand = SqlUtils.cast(teaValueCol, sqlType.postgresName());
 
-      StringBuilder filterString = new StringBuilder();
-      filterString.append(queryCol).append(SPACE);
+        String parameterKey = "attributeFilter_%s_%d".formatted(teaUid, i);
+        String filterString =
+            valueColOperand + SPACE + filter.getSqlOperator() + SPACE + ":" + parameterKey + SPACE;
 
-      filterString.append(
-          switch (filter.getOperator()) {
-            case NULL, NNULL -> filter.getSqlOperator() + SPACE;
-            default -> {
-              mapSqlParameterSource.addValue(
-                  parameterKey,
-                  isNumericTea
-                      ? new BigDecimal(filter.getSqlBindFilter())
-                      : StringUtils.lowerCase(filter.getSqlBindFilter()),
-                  itemType);
-              yield new StringBuilder()
-                  .append(filter.getSqlOperator())
-                  .append(SPACE)
-                  .append(":")
-                  .append(parameterKey)
-                  .append(SPACE);
-            }
-          });
+        // TODO(ivo) remove SneakyThrows but keep this readable
+        // but what does SqlBindFilter do and do we need it in the numeric case?
+        Object value =
+            sqlType
+                .postgresClass()
+                .getConstructor(String.class)
+                .newInstance(filter.getSqlBindFilter());
+        mapSqlParameterSource.addValue(parameterKey, value, sqlType.type());
 
-      filterStrings.add(filterString.toString());
+        filterStrings.add(filterString);
+      } else {
+        String valueColOperand = lower(teaValueCol);
+
+        String parameterKey = "attributeFilter_%s_%d".formatted(teaUid, i);
+        String filterString =
+            valueColOperand + SPACE + filter.getSqlOperator() + SPACE + ":" + parameterKey + SPACE;
+
+        Object value = StringUtils.lowerCase(filter.getSqlBindFilter());
+        mapSqlParameterSource.addValue(parameterKey, value, Types.VARCHAR);
+
+        filterStrings.add(filterString);
+      }
     }
     query.append(String.join(AND, filterStrings));
 
@@ -830,7 +842,7 @@ left join dataelement de on de.uid = eventdatavalue.dataelement_uid
         selectBuilder
             .append(
                 de.getValueType().isNumeric()
-                    ? castToNumber(dataValueValueSql)
+                    ? SqlUtils.castToNumeric(dataValueValueSql)
                     : lower(dataValueValueSql))
             .append(" as ")
             .append(de.getUid())
@@ -1261,7 +1273,7 @@ left join dataelement de on de.uid = eventdatavalue.dataelement_uid
 
       String queryCol =
           de.getValueType().isNumeric()
-              ? castToNumber(dataValueValueSql)
+              ? SqlUtils.castToNumeric(dataValueValueSql)
               : lower(dataValueValueSql);
       selectBuilder.append(", ").append(queryCol).append(" as ").append(deUid);
 

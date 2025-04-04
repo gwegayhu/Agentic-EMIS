@@ -32,12 +32,14 @@ package org.hisp.dhis.common;
 import static java.util.stream.Collectors.toSet;
 
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlRootElement;
+import java.math.BigInteger;
 import java.sql.Types;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -108,6 +110,13 @@ public enum ValueType {
   public static final Set<ValueType> NUMERIC_TYPES =
       Stream.concat(INTEGER_TYPES.stream(), DECIMAL_TYPES.stream())
           .collect(Collectors.toUnmodifiableSet());
+
+  public static final Map<Class<?>, SqlType> JAVA_TO_SQL_TYPES =
+      Map.of(
+          Integer.class, new SqlType(Types.INTEGER, "integer", Integer.class),
+          Double.class, new SqlType(Types.NUMERIC, "numeric", BigInteger.class));
+
+  public record SqlType(int type, String postgresName, Class<?> postgresClass) {}
 
   @Deprecated private final Class<?> javaClass;
 

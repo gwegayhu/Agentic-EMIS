@@ -52,7 +52,6 @@ import org.hisp.dhis.common.BaseIdentifiableObject;
 import org.hisp.dhis.common.IdentifiableObject;
 import org.hisp.dhis.common.IdentifiableObjectManager;
 import org.hisp.dhis.common.QueryFilter;
-import org.hisp.dhis.common.QueryItem;
 import org.hisp.dhis.common.QueryOperator;
 import org.hisp.dhis.common.UID;
 import org.hisp.dhis.dataelement.DataElement;
@@ -339,6 +338,8 @@ class EventExporterTest extends PostgresIntegrationTestBase {
         () -> assertHasTimeStamp(event.getCompletedDate()));
   }
 
+  // TODO(ivo) add tests for filtering using a numeric data value and a like based one and for example in
+  // TODO(ivo) add the same for filtering on attributes
   @Test
   void testExportEventsWhenFilteringByDataElementsLike()
       throws ForbiddenException, BadRequestException {
@@ -354,8 +355,6 @@ class EventExporterTest extends PostgresIntegrationTestBase {
     List<String> events = getEvents(params);
 
     assertContainsOnly(List.of("pTzf9KYMk72"), events);
-
-    new QueryItem(dataElement, QueryOperator.LIKE, "val", dataElement.getValueType(), null, null);
   }
 
   @Test

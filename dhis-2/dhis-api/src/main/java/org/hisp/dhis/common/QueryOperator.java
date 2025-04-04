@@ -44,25 +44,25 @@ import lombok.RequiredArgsConstructor;
 @Getter
 @RequiredArgsConstructor
 public enum QueryOperator {
-  EQ("=", true),
-  GT(">"),
-  GE(">="),
-  LT("<"),
-  LE("<="),
-  LIKE("like"),
-  IN("in", true),
-  SW("sw"),
-  EW("ew"),
-  NULL("is null"),
-  NNULL("is not null"),
+  EQ("=", true, true),
+  GT(">", false, true),
+  GE(">=", false, true),
+  LT("<", false, true),
+  LE("<=", false, true),
+  LIKE("like", false, false),
+  IN("in", true, true),
+  SW("sw", false, false),
+  EW("ew", false, false),
+  NULL("is null", false, false),
+  NNULL("is not null", false, false),
   // Analytics specifics
-  IEQ("==", true),
-  NE("!=", true),
-  NEQ("!=", true),
-  NIEQ("!==", true),
-  NLIKE("not like"),
-  ILIKE("ilike"),
-  NILIKE("not ilike");
+  IEQ("==", true, false),
+  NE("!=", true, true),
+  NEQ("!=", true, true),
+  NIEQ("!==", true, false),
+  NLIKE("not like", false, false),
+  ILIKE("ilike", false, false),
+  NILIKE("not ilike", false, false);
 
   private static final Set<QueryOperator> EQ_OPERATORS = EnumSet.of(EQ, NE, NEQ, IEQ, NIEQ);
 
@@ -78,10 +78,12 @@ public enum QueryOperator {
 
   private final boolean nullAllowed;
 
-  QueryOperator(String value) {
-    this.value = value;
-    this.nullAllowed = false;
-  }
+  /**
+   * // TODO(ivo) this should actually only apply to (tracked entity) attribute values and data
+   * values. I put this here but with that in mind this place does not seem appropriate. Indicates
+   * if operands should be cast to a different PostgreSQL data type than the one used for storage.
+   */
+  private final boolean cast;
 
   public static QueryOperator fromString(String string) {
     if (isBlank(string)) {
