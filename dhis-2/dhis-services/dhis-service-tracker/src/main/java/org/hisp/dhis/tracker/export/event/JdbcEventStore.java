@@ -39,7 +39,6 @@ import com.fasterxml.jackson.databind.ObjectReader;
 import com.google.common.base.Strings;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
-import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
@@ -53,6 +52,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import javax.annotation.Nonnull;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -63,10 +63,10 @@ import org.hisp.dhis.category.CategoryOptionCombo;
 import org.hisp.dhis.common.AssignedUserSelectionMode;
 import org.hisp.dhis.common.IdentifiableObjectManager;
 import org.hisp.dhis.common.QueryFilter;
-import org.hisp.dhis.common.QueryOperator;
 import org.hisp.dhis.common.UID;
 import org.hisp.dhis.common.ValueType;
 import org.hisp.dhis.common.ValueType.SqlType;
+import org.hisp.dhis.common.ValueTypedDimensionalItemObject;
 import org.hisp.dhis.common.collection.CollectionUtils;
 import org.hisp.dhis.commons.util.SqlHelper;
 import org.hisp.dhis.dataelement.DataElement;
@@ -104,6 +104,7 @@ import org.locationtech.jts.io.ParseException;
 import org.locationtech.jts.io.WKTReader;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.RowCallbackHandler;
+import org.springframework.jdbc.core.SqlParameterValue;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -623,134 +624,146 @@ left join dataelement de on de.uid = eventdatavalue.dataelement_uid
           .append(" TE.trackedentityid is not null ") // filters out results from event programs
           .append(AND)
           .append(SPACE)
-          .append(getAttributeFilterQuery(queryItem.getValue(), mapSqlParameterSource, tea));
+          .append(
+              mapFiltersToSql(
+                  queryItem.getValue(),
+                  tea,
+                  quote(tea.getUid()) + ".value",
+                  mapSqlParameterSource));
     }
     return fromBuilder.toString();
   }
 
   @SneakyThrows
-  private String getAttributeFilterQuery(
+  private String mapFiltersToSql(
       List<QueryFilter> filters,
-      MapSqlParameterSource mapSqlParameterSource,
-      TrackedEntityAttribute tea) {
+      ValueTypedDimensionalItemObject valueTypeObject,
+      String column,
+      MapSqlParameterSource sqlParameters) {
     if (filters.isEmpty()) {
       return "";
     }
 
-    String teaUid = tea.getUid();
-    String teaValueCol = quote(teaUid) + ".value";
-    boolean isNumericValueType = tea.getValueType().isNumeric();
-
-    // TODO(ivo) what is the difference between this and filtering on eventdatavalues? if most is
-    // the same make this reusable
-    // TODO(ivo) why don't we use one single builder?
-    // where lower("lw1SqmMlnfh".value) like '%8'
-    // where cast ("lw1SqmMlnfh".value as numeric) in (:parameter_2)
-    // where cast ("lw1SqmMlnfh".value as integer) in (:parameter_2)
     StringBuilder query = new StringBuilder();
-    List<String> filterStrings = new ArrayList<>();
 
     for (int i = 0; i < filters.size(); i++) {
       QueryFilter filter = filters.get(i);
 
-      String filterString = null;
+      String leftOperand = sqlLeftOperand(filter, valueTypeObject, column);
+      String parameterKey = "filter_%s_%d".formatted(valueTypeObject.getUid(), i);
+      String rightOperand = sqlRightOperand(filter, parameterKey);
+      String filterString =
+          leftOperand + SPACE + filter.getSqlOperator() + SPACE + rightOperand + SPACE;
 
-      // left operand
-      String leftOperand = null;
-      if (filter.getOperator().isUnary()) {
-        // lower() is not necessarily needed for unary operators but this will allow the DB to use
-        // the index on lower(teav.value)
-        leftOperand = lower(teaValueCol);
-      } else if (isNumericValueType && filter.getOperator().isCastOperand()) {
-        SqlType sqlType = ValueType.JAVA_TO_SQL_TYPES.get(tea.getValueType().getJavaClass());
-        leftOperand = SqlUtils.cast(teaValueCol, sqlType.postgresName());
-      } else {
-        // this might change in the future as right now ieq and eq behave the same way which is
-        // likely not desired
-        leftOperand = lower(teaValueCol);
+      if (filter.getOperator().isBinary()) {
+        SqlParameterValue sqlParameterValue = mapFilterToSqlParameterValue(filter, valueTypeObject);
+        sqlParameters.addValue(parameterKey, sqlParameterValue);
       }
 
-      // OPERATOR
-      // TODO(ivo) can I remove the trailing space here?
-      filterString = leftOperand + SPACE + filter.getSqlOperator() + SPACE;
-
-      if (filter.getOperator().isUnary()) {
-        filterStrings.add(filterString);
-        continue;
+      query.append(filterString);
+      if (i + 1 < filters.size()) {
+        query.append(AND);
       }
-
-      // right operand
-      String parameterKey = "attributeFilter_%s_%d".formatted(teaUid, i);
-      if (filter.getOperator().isIn()) {
-        filterString += SPACE + "(:" + parameterKey + ")" + SPACE;
-      } else {
-        filterString += SPACE + ":" + parameterKey + SPACE;
-      }
-
-      // parameters
-      if (isNumericValueType && filter.getOperator().isCastOperand()) {
-        // TODO(ivo) remove SneakyThrows but keep this readable
-        // but what does SqlBindFilter do and do we need it in the numeric case?
-        SqlType sqlType = ValueType.JAVA_TO_SQL_TYPES.get(tea.getValueType().getJavaClass());
-
-        // TODO(ivo) that here could be a function on operator, value type
-        // (filter) -> Object : to get the sql parameter source value
-        // (BaseDimensionalItemObject|ValueType) -> int : to get the int sqlType
-        // or encapsulate the above using SqlParameterValue? to call addValue(String paramName,
-        // Object value) where Object can be a SqlParameterValue
-        // (filter) -> SqlParameterValue
-        Object value = null;
-        if (filter.getOperator().isIn()) {
-          value =
-              QueryFilter.getFilterItems(filter.getFilter()).stream()
-                  .map(
-                      s -> {
-                        try {
-                          return sqlType
-                              .postgresClass()
-                              .getConstructor(String.class)
-                              .newInstance(s);
-                        } catch (InstantiationException e) {
-                          throw new RuntimeException(e);
-                        } catch (IllegalAccessException e) {
-                          throw new RuntimeException(e);
-                        } catch (InvocationTargetException e) {
-                          throw new RuntimeException(e);
-                        } catch (NoSuchMethodException e) {
-                          throw new RuntimeException(e);
-                        }
-                      })
-                  .toList();
-        } else {
-          value =
-              sqlType
-                  .postgresClass()
-                  .getConstructor(String.class)
-                  .newInstance(filter.getSqlBindFilter());
-        }
-
-        mapSqlParameterSource.addValue(parameterKey, value, sqlType.type());
-      } else {
-        // TODO(ivo) I think this needs to be getSqlFilter, no? I don't think in will work right now
-        // for non numeric value types
-        Object value = null;
-        if (filter.getOperator().isIn()) {
-          value =
-              QueryFilter.getFilterItems(filter.getFilter()).stream()
-                  .map(StringUtils::lowerCase)
-                  .toList();
-        } else {
-          value = StringUtils.lowerCase(filter.getSqlBindFilter());
-        }
-        mapSqlParameterSource.addValue(parameterKey, value, Types.VARCHAR);
-      }
-
-      filterStrings.add(filterString);
     }
 
-    query.append(String.join(AND, filterStrings));
-
     return query.toString();
+  }
+
+  @Nonnull
+  private static String sqlLeftOperand(
+      QueryFilter filter, ValueTypedDimensionalItemObject valueTypedObject, String column) {
+    String leftOperand;
+    // TODO(ivo) whats the difference in ev.eventdatavalues->'uid' is not null vs ev.eventdatavalues
+    // #>> '{"uid", value}' is not null?
+    if (filter.getOperator().isUnary()) {
+      // TODO(ivo) this might not be true for data elements, right?
+      // lower() is not necessarily needed for unary operators but this will allow the DB to use
+      // the index on lower(teav.value)
+      leftOperand = lower(column);
+    } else if (valueTypedObject.getValueType().isNumeric()
+        && filter.getOperator().isCastOperand()) {
+      SqlType sqlType =
+          ValueType.JAVA_TO_SQL_TYPES.get(valueTypedObject.getValueType().getJavaClass());
+      leftOperand = SqlUtils.cast(column, sqlType.postgresName());
+    } else {
+      // this might change in the future as right now ieq and eq behave the same way which is
+      // likely not desired
+      leftOperand = lower(column);
+    }
+    return leftOperand;
+  }
+
+  @Nonnull
+  private static String sqlRightOperand(QueryFilter filter, String parameterKey) {
+    if (filter.getOperator().isUnary()) {
+      return "";
+    }
+
+    if (filter.getOperator().isIn()) {
+      return "(:" + parameterKey + ")";
+    }
+
+    return ":" + parameterKey;
+  }
+
+  // TODO(ivo) make this pretty :joy:, maybe after figuring out where we will do our validation
+  @Nonnull
+  private static SqlParameterValue mapFilterToSqlParameterValue(
+      QueryFilter filter, ValueTypedDimensionalItemObject valueTypeObject)
+      throws InstantiationException,
+          IllegalAccessException,
+          InvocationTargetException,
+          NoSuchMethodException {
+    SqlParameterValue sqlParameterValue;
+    Object value;
+    if (valueTypeObject.getValueType().isNumeric() && filter.getOperator().isCastOperand()) {
+      // TODO(ivo) remove SneakyThrows but keep this readable
+      // but what does SqlBindFilter do and do we need it in the numeric case?
+      SqlType sqlType =
+          ValueType.JAVA_TO_SQL_TYPES.get(valueTypeObject.getValueType().getJavaClass());
+
+      // TODO(ivo) that here could be a function on operator, value type
+      // extract function
+      // (filter) -> SqlParameterValue
+      // then call addValue(String paramName, Object value)
+      if (filter.getOperator().isIn()) {
+        value =
+            QueryFilter.getFilterItems(filter.getFilter()).stream()
+                .map(
+                    s -> {
+                      try {
+                        return sqlType.postgresClass().getConstructor(String.class).newInstance(s);
+                      } catch (InstantiationException e) {
+                        throw new RuntimeException(e);
+                      } catch (IllegalAccessException e) {
+                        throw new RuntimeException(e);
+                      } catch (InvocationTargetException e) {
+                        throw new RuntimeException(e);
+                      } catch (NoSuchMethodException e) {
+                        throw new RuntimeException(e);
+                      }
+                    })
+                .toList();
+      } else {
+        value =
+            sqlType
+                .postgresClass()
+                .getConstructor(String.class)
+                .newInstance(filter.getSqlBindFilter());
+      }
+      sqlParameterValue = new SqlParameterValue(sqlType.type(), value);
+    } else {
+      if (filter.getOperator().isIn()) {
+        value =
+            QueryFilter.getFilterItems(filter.getFilter()).stream()
+                .map(StringUtils::lowerCase)
+                .toList();
+      } else {
+        value = StringUtils.lowerCase(filter.getSqlBindFilter());
+      }
+      sqlParameterValue = new SqlParameterValue(Types.VARCHAR, value);
+    }
+    return sqlParameterValue;
   }
 
   /**
@@ -902,6 +915,7 @@ left join dataelement de on de.uid = eventdatavalue.dataelement_uid
             .append("_value, ");
       } else if (order.getField() instanceof DataElement de) {
         final String dataValueValueSql = "ev.eventdatavalues #>> '{" + de.getUid() + ", value}'";
+        // TODO(ivo) that cast needs to change as well
         selectBuilder
             .append(
                 de.getValueType().isNumeric()
@@ -1317,21 +1331,15 @@ left join dataelement de on de.uid = eventdatavalue.dataelement_uid
    */
   private StringBuilder dataElementFiltersSql(
       EventQueryParams params,
-      MapSqlParameterSource mapSqlParameterSource,
+      MapSqlParameterSource sqlParameters,
       SqlHelper hlp,
       StringBuilder selectBuilder) {
-    int filterCount = 0;
 
     StringBuilder eventDataValuesWhereSql = new StringBuilder();
 
     for (Entry<DataElement, List<QueryFilter>> item : params.getDataElements().entrySet()) {
-      ++filterCount;
-
       DataElement de = item.getKey();
-      List<QueryFilter> filters = item.getValue();
       final String deUid = de.getUid();
-      final int itemValueType = de.getValueType().isNumeric() ? Types.NUMERIC : Types.VARCHAR;
-
       final String dataValueValueSql = "ev.eventdatavalues #>> '{" + deUid + ", value}'";
 
       String queryCol =
@@ -1340,68 +1348,13 @@ left join dataelement de on de.uid = eventdatavalue.dataelement_uid
               : lower(dataValueValueSql);
       selectBuilder.append(", ").append(queryCol).append(" as ").append(deUid);
 
-      for (QueryFilter filter : filters) {
-        ++filterCount;
-        String bindParameter = "parameter_" + filterCount;
-
-        eventDataValuesWhereSql.append(hlp.whereAnd());
-
-        if (filter.getOperator().isUnary()) {
-          eventDataValuesWhereSql.append(unaryOperatorCondition(filter.getOperator(), deUid));
-        } else if (QueryOperator.IN.getValue().equalsIgnoreCase(filter.getSqlOperator())) {
-          mapSqlParameterSource.addValue(
-              bindParameter,
-              QueryFilter.getFilterItems(StringUtils.lowerCase(filter.getFilter())),
-              itemValueType);
-
-          eventDataValuesWhereSql.append(inCondition(filter, bindParameter, queryCol));
-        } else {
-          mapSqlParameterSource.addValue(
-              bindParameter,
-              de.getValueType().isNumeric()
-                  ? new BigDecimal(filter.getSqlBindFilter())
-                  : StringUtils.lowerCase(filter.getSqlBindFilter()),
-              itemValueType);
-
-          eventDataValuesWhereSql
-              .append(" ")
-              .append(queryCol)
-              .append(" ")
-              .append(filter.getSqlOperator())
-              .append(" ")
-              .append(":")
-              .append(bindParameter)
-              .append(" ");
-        }
-      }
+      eventDataValuesWhereSql.append(hlp.whereAnd());
+      eventDataValuesWhereSql.append(" ");
+      eventDataValuesWhereSql.append(
+          mapFiltersToSql(item.getValue(), de, dataValueValueSql, sqlParameters));
     }
 
     return eventDataValuesWhereSql.append(" ");
-  }
-
-  private String unaryOperatorCondition(QueryOperator queryOperator, String deUid) {
-    return new StringBuilder()
-        .append(" ev.eventdatavalues->")
-        .append("'")
-        .append(deUid)
-        .append("' ")
-        .append(queryOperator.getValue())
-        .append(" ")
-        .toString();
-  }
-
-  private String inCondition(QueryFilter filter, String boundParameter, String queryCol) {
-    return new StringBuilder()
-        .append(" ")
-        .append(queryCol)
-        .append(" ")
-        .append(filter.getSqlOperator())
-        .append(" ")
-        .append("(")
-        .append(":")
-        .append(boundParameter)
-        .append(") ")
-        .toString();
   }
 
   private String eventStatusSql(
