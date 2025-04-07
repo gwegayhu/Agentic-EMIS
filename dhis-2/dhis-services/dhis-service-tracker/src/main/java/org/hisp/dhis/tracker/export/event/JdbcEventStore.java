@@ -38,6 +38,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.google.common.base.Strings;
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -640,7 +641,8 @@ left join dataelement de on de.uid = eventdatavalue.dataelement_uid
     String teaValueCol = quote(teaUid) + ".value";
     boolean isNumericValueType = tea.getValueType().isNumeric();
 
-    // TODO(ivo) what is the difference between this and filtering on eventdatavalues? if most is the same make this reusable
+    // TODO(ivo) what is the difference between this and filtering on eventdatavalues? if most is
+    // the same make this reusable
     // TODO(ivo) why don't we use one single builder?
     // where lower("lw1SqmMlnfh".value) like '%8'
     // where cast ("lw1SqmMlnfh".value as numeric) in (:parameter_2)
@@ -650,41 +652,102 @@ left join dataelement de on de.uid = eventdatavalue.dataelement_uid
 
     for (int i = 0; i < filters.size(); i++) {
       QueryFilter filter = filters.get(i);
+
+      String filterString = null;
+
+      // left operand
+      String leftOperand = null;
       if (filter.getOperator().isUnary()) {
         // lower() is not necessarily needed for unary operators but this will allow the DB to use
         // the index on lower(teav.value)
-        filterStrings.add(lower(teaValueCol) + SPACE + filter.getSqlOperator() + SPACE);
-      } else if (isNumericValueType && filter.getOperator().isCast()) {
+        leftOperand = lower(teaValueCol);
+      } else if (isNumericValueType && filter.getOperator().isCastOperand()) {
         SqlType sqlType = ValueType.JAVA_TO_SQL_TYPES.get(tea.getValueType().getJavaClass());
-        String valueColOperand = SqlUtils.cast(teaValueCol, sqlType.postgresName());
+        leftOperand = SqlUtils.cast(teaValueCol, sqlType.postgresName());
+      } else {
+        // this might change in the future as right now ieq and eq behave the same way which is
+        // likely not desired
+        leftOperand = lower(teaValueCol);
+      }
 
-        String parameterKey = "attributeFilter_%s_%d".formatted(teaUid, i);
-        String filterString =
-            valueColOperand + SPACE + filter.getSqlOperator() + SPACE + ":" + parameterKey + SPACE;
+      // OPERATOR
+      // TODO(ivo) can I remove the trailing space here?
+      filterString = leftOperand + SPACE + filter.getSqlOperator() + SPACE;
 
+      if (filter.getOperator().isUnary()) {
+        filterStrings.add(filterString);
+        continue;
+      }
+
+      // right operand
+      String parameterKey = "attributeFilter_%s_%d".formatted(teaUid, i);
+      if (filter.getOperator().isIn()) {
+        filterString += SPACE + "(:" + parameterKey + ")" + SPACE;
+      } else {
+        filterString += SPACE + ":" + parameterKey + SPACE;
+      }
+
+      // parameters
+      if (isNumericValueType && filter.getOperator().isCastOperand()) {
         // TODO(ivo) remove SneakyThrows but keep this readable
         // but what does SqlBindFilter do and do we need it in the numeric case?
-        Object value =
-            sqlType
-                .postgresClass()
-                .getConstructor(String.class)
-                .newInstance(filter.getSqlBindFilter());
+        SqlType sqlType = ValueType.JAVA_TO_SQL_TYPES.get(tea.getValueType().getJavaClass());
+
+        // TODO(ivo) that here could be a function on operator, value type
+        // (filter) -> Object : to get the sql parameter source value
+        // (BaseDimensionalItemObject|ValueType) -> int : to get the int sqlType
+        // or encapsulate the above using SqlParameterValue? to call addValue(String paramName,
+        // Object value) where Object can be a SqlParameterValue
+        // (filter) -> SqlParameterValue
+        Object value = null;
+        if (filter.getOperator().isIn()) {
+          value =
+              QueryFilter.getFilterItems(filter.getFilter()).stream()
+                  .map(
+                      s -> {
+                        try {
+                          return sqlType
+                              .postgresClass()
+                              .getConstructor(String.class)
+                              .newInstance(s);
+                        } catch (InstantiationException e) {
+                          throw new RuntimeException(e);
+                        } catch (IllegalAccessException e) {
+                          throw new RuntimeException(e);
+                        } catch (InvocationTargetException e) {
+                          throw new RuntimeException(e);
+                        } catch (NoSuchMethodException e) {
+                          throw new RuntimeException(e);
+                        }
+                      })
+                  .toList();
+        } else {
+          value =
+              sqlType
+                  .postgresClass()
+                  .getConstructor(String.class)
+                  .newInstance(filter.getSqlBindFilter());
+        }
+
         mapSqlParameterSource.addValue(parameterKey, value, sqlType.type());
-
-        filterStrings.add(filterString);
       } else {
-        String valueColOperand = lower(teaValueCol);
-
-        String parameterKey = "attributeFilter_%s_%d".formatted(teaUid, i);
-        String filterString =
-            valueColOperand + SPACE + filter.getSqlOperator() + SPACE + ":" + parameterKey + SPACE;
-
-        Object value = StringUtils.lowerCase(filter.getSqlBindFilter());
+        // TODO(ivo) I think this needs to be getSqlFilter, no? I don't think in will work right now
+        // for non numeric value types
+        Object value = null;
+        if (filter.getOperator().isIn()) {
+          value =
+              QueryFilter.getFilterItems(filter.getFilter()).stream()
+                  .map(StringUtils::lowerCase)
+                  .toList();
+        } else {
+          value = StringUtils.lowerCase(filter.getSqlBindFilter());
+        }
         mapSqlParameterSource.addValue(parameterKey, value, Types.VARCHAR);
-
-        filterStrings.add(filterString);
       }
+
+      filterStrings.add(filterString);
     }
+
     query.append(String.join(AND, filterStrings));
 
     return query.toString();

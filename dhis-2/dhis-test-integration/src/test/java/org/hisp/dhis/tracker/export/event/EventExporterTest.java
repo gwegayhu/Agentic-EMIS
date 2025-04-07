@@ -55,7 +55,6 @@ import org.hisp.dhis.common.QueryFilter;
 import org.hisp.dhis.common.QueryOperator;
 import org.hisp.dhis.common.UID;
 import org.hisp.dhis.dataelement.DataElement;
-import org.hisp.dhis.dataelement.DataElementService;
 import org.hisp.dhis.feedback.BadRequestException;
 import org.hisp.dhis.feedback.ForbiddenException;
 import org.hisp.dhis.organisationunit.OrganisationUnit;
@@ -68,6 +67,7 @@ import org.hisp.dhis.relationship.Relationship;
 import org.hisp.dhis.relationship.RelationshipItem;
 import org.hisp.dhis.test.integration.PostgresIntegrationTestBase;
 import org.hisp.dhis.trackedentity.TrackedEntity;
+import org.hisp.dhis.trackedentity.TrackedEntityAttribute;
 import org.hisp.dhis.tracker.TestSetup;
 import org.hisp.dhis.user.User;
 import org.hisp.dhis.util.DateUtils;
@@ -90,8 +90,6 @@ class EventExporterTest extends PostgresIntegrationTestBase {
   @Autowired private EventService eventService;
 
   @Autowired private IdentifiableObjectManager manager;
-
-  @Autowired private DataElementService dataElementService;
 
   private OrganisationUnit orgUnit;
 
@@ -338,10 +336,157 @@ class EventExporterTest extends PostgresIntegrationTestBase {
         () -> assertHasTimeStamp(event.getCompletedDate()));
   }
 
-  // TODO(ivo) add tests for filtering using a numeric data value and a like based one and for example in
-  // TODO(ivo) add the same for filtering on attributes
+  // double-check I have all the tests for filterAttributes
+  // TODO(ivo) test validation failed for a binary operators rhs like lt or eq or so and in as this
+  // one is special
+  // TODO(ivo) what do bindfilter/filter do? do we need this encoding logic that is in one of the
+  // methods?
+  // TODO(ivo) filter: add tests numeric data value: unary, binary with cast, binary without cast so
+  // like based, add error one?
+  // TODO(ivo) filter: add tests text data value: unary, binary with cast, binary without cast so
+  // like based, add error one?
+  // TODO(ivo) why do other tests add the '%' in the filter value? should we get rid of it or are
+  // they testing something specific
+  // TODO(ivo) should we also test double? to show 170 will find 170.0 for example
   @Test
-  void testExportEventsWhenFilteringByDataElementsLike()
+  void testExportEventsWhenFilteringByNumericAttributesUsingIn()
+      throws ForbiddenException, BadRequestException {
+    // Operators sw is based on SQL like which is supported for numeric value types by not casting
+    // values i.e. treating them as strings
+    TrackedEntityAttribute attr = get(TrackedEntityAttribute.class, "numericAttr");
+    EventOperationParams params =
+        operationParamsBuilder
+            .orgUnitMode(ACCESSIBLE)
+            .filterByAttribute(UID.of(attr), List.of(new QueryFilter(QueryOperator.IN, "70;72")))
+            .build();
+
+    List<String> events = getEvents(params);
+
+    assertContainsOnly(List.of("D9PbzJY8bJM", "jxgFyJEMUPf"), events);
+  }
+
+  @Test
+  void testExportEventsWhenFilteringByTextAttributesUsingIn()
+      throws ForbiddenException, BadRequestException {
+    TrackedEntityAttribute attr = get(TrackedEntityAttribute.class, "toUpdate000");
+    EventOperationParams params =
+        operationParamsBuilder
+            .orgUnitMode(ACCESSIBLE)
+            .filterByAttribute(
+                UID.of(attr), List.of(new QueryFilter(QueryOperator.IN, "Summer day;rainy Day")))
+            .build();
+
+    List<String> events = getEvents(params);
+
+    assertContainsOnly(
+        List.of(
+            "YKmfzHdjUDL",
+            "LCSfHnurnNB",
+            "SbUJzkxKYAG",
+            "gvULMgNiAfM",
+            "JaRDIvcEcEx",
+            "jxgFyJEMUPf",
+            "D9PbzJY8bJM",
+            "pTzf9KYMk72"),
+        events);
+  }
+
+  @Test
+  void testExportEventsWhenFilteringByNumericAttributesUsingStartsWith()
+      throws ForbiddenException, BadRequestException {
+    // Operators sw is based on SQL like which is supported for numeric value types by not casting
+    // values i.e. treating them as strings
+    TrackedEntityAttribute attr = get(TrackedEntityAttribute.class, "numericAttr");
+    EventOperationParams params =
+        operationParamsBuilder
+            .orgUnitMode(ACCESSIBLE)
+            .filterByAttribute(UID.of(attr), List.of(new QueryFilter(QueryOperator.SW, "7")))
+            .build();
+
+    List<String> events = getEvents(params);
+
+    assertContainsOnly(List.of("D9PbzJY8bJM", "jxgFyJEMUPf"), events);
+  }
+
+  @Test
+  void testExportEventsWhenFilteringByTextAttributesUsingStartsWith()
+      throws ForbiddenException, BadRequestException {
+    TrackedEntityAttribute attr = get(TrackedEntityAttribute.class, "toUpdate000");
+    EventOperationParams params =
+        operationParamsBuilder
+            .orgUnitMode(ACCESSIBLE)
+            .filterByAttribute(UID.of(attr), List.of(new QueryFilter(QueryOperator.SW, "RAiny")))
+            .build();
+
+    List<String> events = getEvents(params);
+
+    assertContainsOnly(List.of("D9PbzJY8bJM"), events);
+  }
+
+  @Test
+  void testExportEventsWhenFilteringByNumericAttributesUsingLessThan()
+      throws ForbiddenException, BadRequestException {
+    TrackedEntityAttribute attr = get(TrackedEntityAttribute.class, "numericAttr");
+    EventOperationParams params =
+        operationParamsBuilder
+            .orgUnitMode(ACCESSIBLE)
+            .filterByAttribute(UID.of(attr), List.of(new QueryFilter(QueryOperator.LT, "71")))
+            .build();
+
+    List<String> events = getEvents(params);
+
+    assertContainsOnly(List.of("D9PbzJY8bJM"), events);
+  }
+
+  @Test
+  void testExportEventsWhenFilteringByTextAttributesUsingLessThan()
+      throws ForbiddenException, BadRequestException {
+    TrackedEntityAttribute attr = get(TrackedEntityAttribute.class, "toUpdate000");
+    EventOperationParams params =
+        operationParamsBuilder
+            .orgUnitMode(ACCESSIBLE)
+            .filterByAttribute(
+                UID.of(attr), List.of(new QueryFilter(QueryOperator.LT, "summer day")))
+            .build();
+
+    List<String> events = getEvents(params);
+
+    assertContainsOnly(List.of("D9PbzJY8bJM"), events);
+  }
+
+  @Test
+  void testExportEventsWhenFilteringByTextAttributesUsingNotNull()
+      throws ForbiddenException, BadRequestException {
+    TrackedEntityAttribute attr = get(TrackedEntityAttribute.class, "notUpdated0");
+    EventOperationParams params =
+        operationParamsBuilder
+            .orgUnitMode(ACCESSIBLE)
+            .filterByAttribute(UID.of(attr), List.of(new QueryFilter(QueryOperator.NNULL)))
+            .build();
+
+    List<String> events = getEvents(params);
+
+    assertContainsOnly(List.of("D9PbzJY8bJM"), events);
+  }
+
+  @Test
+  void testExportEventsWhenFilteringByNumericAttributesUsingNotNull()
+      throws ForbiddenException, BadRequestException {
+    TrackedEntityAttribute attr = get(TrackedEntityAttribute.class, "numericAttr");
+    EventOperationParams params =
+        operationParamsBuilder
+            .orgUnitMode(ACCESSIBLE)
+            .trackedEntity(UID.of("dUE514NMOlo"))
+            .filterByAttribute(UID.of(attr), List.of(new QueryFilter(QueryOperator.NNULL)))
+            .build();
+
+    List<String> events = getEvents(params);
+
+    assertContainsOnly(List.of("D9PbzJY8bJM"), events);
+  }
+
+  @Test
+  void testExportEventsWhenFilteringByTextDataElementsUsingLike()
       throws ForbiddenException, BadRequestException {
     DataElement dataElement = dataElement(UID.of("DATAEL00001"));
     EventOperationParams params =
@@ -358,7 +503,7 @@ class EventExporterTest extends PostgresIntegrationTestBase {
   }
 
   @Test
-  void testExportEventsWhenFilteringByDataElementsWithStatusFilter()
+  void testExportEventsWhenFilteringByTextDataElementsUsingLikeWithStatusFilter()
       throws ForbiddenException, BadRequestException {
     DataElement dataElement = dataElement(UID.of("DATAEL00001"));
 
@@ -377,7 +522,7 @@ class EventExporterTest extends PostgresIntegrationTestBase {
   }
 
   @Test
-  void testExportEventsWhenFilteringByDataElementsWithProgramTypeFilter()
+  void testExportEventsWhenFilteringByTextDataElementsUsingLikeWithProgramTypeFilter()
       throws ForbiddenException, BadRequestException {
     DataElement dataElement = dataElement(UID.of("DATAEL00001"));
 
@@ -396,7 +541,7 @@ class EventExporterTest extends PostgresIntegrationTestBase {
   }
 
   @Test
-  void testExportEventsWhenFilteringByDataElementsEqual()
+  void testExportEventsWhenFilteringByTextDataElementsUsingLikeAgain()
       throws ForbiddenException, BadRequestException {
     DataElement dataElement = dataElement(UID.of("DATAEL00001"));
 
@@ -414,7 +559,7 @@ class EventExporterTest extends PostgresIntegrationTestBase {
   }
 
   @Test
-  void testExportEventsWhenFilteringByDataElementsIn()
+  void testExportEventsWhenFilteringByTextDataElementsUsingIn()
       throws ForbiddenException, BadRequestException {
     DataElement dataElement = dataElement(UID.of("DATAEL00001"));
 
@@ -433,7 +578,7 @@ class EventExporterTest extends PostgresIntegrationTestBase {
   }
 
   @Test
-  void testExportEventsWhenFilteringByDataElementsWithCategoryOptionSuperUser()
+  void testExportEventsWhenFilteringByTextDataElementsUsingEqWithCategoryOptionSuperUser()
       throws ForbiddenException, BadRequestException {
     DataElement dataElement = dataElement(UID.of("DATAEL00001"));
 
@@ -488,7 +633,7 @@ class EventExporterTest extends PostgresIntegrationTestBase {
   }
 
   @Test
-  void testExportEventsWhenFilteringByDataElementsWithCategoryOptionNotSuperUser()
+  void testExportEventsWhenFilteringByDataElementsUsingEqWithCategoryOptionNotSuperUser()
       throws ForbiddenException, BadRequestException {
     injectSecurityContextUser(
         createAndAddUser(false, "user", Set.of(orgUnit), Set.of(orgUnit), "F_EXPORT_DATA"));
@@ -511,7 +656,7 @@ class EventExporterTest extends PostgresIntegrationTestBase {
   }
 
   @Test
-  void testExportEventsWhenFilteringByDataElementsWithOptionSetEqual()
+  void testExportEventsWhenFilteringByDataElementsUsingOptionSetEqual()
       throws ForbiddenException, BadRequestException {
     DataElement dataElement = dataElement(UID.of("DATAEL00005"));
     EventOperationParams params =
@@ -528,7 +673,7 @@ class EventExporterTest extends PostgresIntegrationTestBase {
   }
 
   @Test
-  void testExportEventsWhenFilteringByDataElementsWithOptionSetIn()
+  void testExportEventsWhenFilteringByDataElementsUsingOptionSetIn()
       throws ForbiddenException, BadRequestException {
     DataElement dataElement = dataElement(UID.of("DATAEL00005"));
     EventOperationParams params =
@@ -545,7 +690,7 @@ class EventExporterTest extends PostgresIntegrationTestBase {
   }
 
   @Test
-  void testExportEventsWhenFilteringByDataElementsWithOptionSetLike()
+  void testExportEventsWhenFilteringByDataElementsUsingOptionSetLike()
       throws ForbiddenException, BadRequestException {
     DataElement dataElement = dataElement(UID.of("DATAEL00005"));
     EventOperationParams params =
@@ -562,7 +707,7 @@ class EventExporterTest extends PostgresIntegrationTestBase {
   }
 
   @Test
-  void testExportEventsWhenFilteringByNumericDataElements()
+  void testExportEventsWhenFilteringByNumericDataElementsUsingComparisonRange()
       throws ForbiddenException, BadRequestException {
     DataElement dataElement = dataElement(UID.of("DATAEL00006"));
     EventOperationParams params =
@@ -1049,7 +1194,7 @@ class EventExporterTest extends PostgresIntegrationTestBase {
   }
 
   private DataElement dataElement(UID uid) {
-    return dataElementService.getDataElement(uid.getValue());
+    return get(DataElement.class, uid.getValue());
   }
 
   private <T extends IdentifiableObject> T get(Class<T> type, String uid) {

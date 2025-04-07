@@ -462,7 +462,8 @@ class EventQueryParams {
 
   public EventQueryParams filterBy(
       @Nonnull TrackedEntityAttribute tea, @Nonnull QueryFilter filter) {
-    validateNumericFilterValue(tea, filter);
+    // TODO(ivo) move validation back into store
+    //    validateNumericFilterValue(tea, filter);
     this.attributes.putIfAbsent(tea, new ArrayList<>());
     this.attributes.get(tea).add(filter);
     return this;
@@ -474,7 +475,7 @@ class EventQueryParams {
   }
 
   public EventQueryParams filterBy(@Nonnull DataElement de, @Nonnull QueryFilter filter) {
-    validateNumericFilterValue(de, filter);
+    //    validateNumericFilterValue(de, filter);
     this.dataElements.putIfAbsent(de, new ArrayList<>());
     this.dataElements.get(de).add(filter);
     this.hasDataElementFilter = true;
@@ -497,6 +498,8 @@ class EventQueryParams {
    */
   private void validateNumericFilterValue(
       ValueTypedDimensionalItemObject item, QueryFilter filter) {
+    // TODO(ivo) we should only validate if we cast!
+    // we need to validate getFilterItems() for IN
     if (!item.getValueType().isNumeric() || filter.getOperator().isUnary()) {
       return;
     }

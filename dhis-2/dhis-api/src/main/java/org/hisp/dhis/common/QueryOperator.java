@@ -83,7 +83,7 @@ public enum QueryOperator {
    * values. I put this here but with that in mind this place does not seem appropriate. Indicates
    * if operands should be cast to a different PostgreSQL data type than the one used for storage.
    */
-  private final boolean cast;
+  private final boolean castOperand;
 
   public static QueryOperator fromString(String string) {
     if (isBlank(string)) {
