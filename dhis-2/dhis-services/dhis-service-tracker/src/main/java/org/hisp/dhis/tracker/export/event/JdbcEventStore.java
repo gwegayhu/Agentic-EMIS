@@ -610,26 +610,19 @@ left join dataelement de on de.uid = eventdatavalue.dataelement_uid
    * applies when an attribute filter is specified.
    */
   private String getWhereClauseFromAttributeFilterConditions(
-      EventQueryParams params, MapSqlParameterSource mapSqlParameterSource, SqlHelper hlp) {
+      EventQueryParams params, MapSqlParameterSource sqlParameters, SqlHelper hlp) {
     StringBuilder fromBuilder = new StringBuilder();
     for (Entry<TrackedEntityAttribute, List<QueryFilter>> queryItem :
         params.getAttributes().entrySet()) {
       TrackedEntityAttribute tea = queryItem.getKey();
 
-      // TODO(ivo) why do we append 'AND ' even if the filter query might be ''?
-      // the signature is odd. we return the SQL string but pass in the sql parameters. Either only
-      // return or only capture
       fromBuilder
           .append(hlp.whereAnd())
           .append(" TE.trackedentityid is not null ") // filters out results from event programs
-          .append(AND)
           .append(SPACE)
           .append(
               mapFiltersToSql(
-                  queryItem.getValue(),
-                  tea,
-                  quote(tea.getUid()) + ".value",
-                  mapSqlParameterSource));
+                  queryItem.getValue(), tea, quote(tea.getUid()) + ".value", sqlParameters));
     }
     return fromBuilder.toString();
   }
@@ -644,7 +637,7 @@ left join dataelement de on de.uid = eventdatavalue.dataelement_uid
       return "";
     }
 
-    StringBuilder query = new StringBuilder();
+    StringBuilder sql = new StringBuilder(AND + SPACE);
 
     for (int i = 0; i < filters.size(); i++) {
       QueryFilter filter = filters.get(i);
@@ -660,13 +653,13 @@ left join dataelement de on de.uid = eventdatavalue.dataelement_uid
         sqlParameters.addValue(parameterKey, sqlParameterValue);
       }
 
-      query.append(filterString);
+      sql.append(filterString);
       if (i + 1 < filters.size()) {
-        query.append(AND);
+        sql.append(AND);
       }
     }
 
-    return query.toString();
+    return sql.toString();
   }
 
   @Nonnull
@@ -899,7 +892,7 @@ left join dataelement de on de.uid = eventdatavalue.dataelement_uid
                 mapSqlParameterSource,
                 user,
                 hlp,
-                dataElementFiltersSql(params, mapSqlParameterSource, hlp, selectBuilder)))
+                dataElementFiltersSql(params, mapSqlParameterSource, selectBuilder)))
         .toString();
   }
 
@@ -1330,31 +1323,26 @@ left join dataelement de on de.uid = eventdatavalue.dataelement_uid
    * in where clause.
    */
   private StringBuilder dataElementFiltersSql(
-      EventQueryParams params,
-      MapSqlParameterSource sqlParameters,
-      SqlHelper hlp,
-      StringBuilder selectBuilder) {
-
-    StringBuilder eventDataValuesWhereSql = new StringBuilder();
+      EventQueryParams params, MapSqlParameterSource sqlParameters, StringBuilder selectBuilder) {
+    StringBuilder sql = new StringBuilder();
 
     for (Entry<DataElement, List<QueryFilter>> item : params.getDataElements().entrySet()) {
       DataElement de = item.getKey();
       final String deUid = de.getUid();
       final String dataValueValueSql = "ev.eventdatavalues #>> '{" + deUid + ", value}'";
 
+      // TODO(ivo) do we need to adjust this cast as well? to integer/numeric, what purpose does
+      // this one serve?
       String queryCol =
           de.getValueType().isNumeric()
               ? SqlUtils.castToNumeric(dataValueValueSql)
               : lower(dataValueValueSql);
       selectBuilder.append(", ").append(queryCol).append(" as ").append(deUid);
 
-      eventDataValuesWhereSql.append(hlp.whereAnd());
-      eventDataValuesWhereSql.append(" ");
-      eventDataValuesWhereSql.append(
-          mapFiltersToSql(item.getValue(), de, dataValueValueSql, sqlParameters));
+      sql.append(mapFiltersToSql(item.getValue(), de, dataValueValueSql, sqlParameters));
     }
 
-    return eventDataValuesWhereSql.append(" ");
+    return sql.append(" ");
   }
 
   private String eventStatusSql(
