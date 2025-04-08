@@ -32,7 +32,6 @@ package org.hisp.dhis.common;
 import static java.util.stream.Collectors.toSet;
 
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlRootElement;
-import java.math.BigInteger;
 import java.sql.Types;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -41,6 +40,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.hisp.dhis.analytics.AggregationType;
@@ -111,12 +111,23 @@ public enum ValueType {
       Stream.concat(INTEGER_TYPES.stream(), DECIMAL_TYPES.stream())
           .collect(Collectors.toUnmodifiableSet());
 
-  public static final Map<Class<?>, SqlType> JAVA_TO_SQL_TYPES =
+  /**
+   * https://github.com/pgjdbc/pgjdbc/blob/156d724e1d95052b41a19fb568b2f81919ae2197/pgjdbc/src/main/java/org/postgresql/jdbc/TypeInfoCache.java#L84
+   */
+  public static final Map<Class<?>, SqlType<?>> JAVA_TO_SQL_TYPES =
       Map.of(
-          Integer.class, new SqlType(Types.INTEGER, "integer", Integer.class),
-          Double.class, new SqlType(Types.NUMERIC, "numeric", BigInteger.class));
+          Integer.class, new SqlType<>(Types.INTEGER, "integer", Integer.class, Integer::valueOf),
+          Double.class,
+              new SqlType<>(
+                  Types.NUMERIC, "numeric", java.math.BigDecimal.class, java.math.BigDecimal::new),
+          String.class,
+              new SqlType<String>(Types.VARCHAR, "text", String.class, Function.identity()));
 
-  public record SqlType(int type, String postgresName, Class<?> postgresClass) {}
+  public record SqlType<T>(
+      int type,
+      String postgresName,
+      Class<T> postgresClass,
+      java.util.function.Function<String, T> producer) {}
 
   @Deprecated private final Class<?> javaClass;
 
