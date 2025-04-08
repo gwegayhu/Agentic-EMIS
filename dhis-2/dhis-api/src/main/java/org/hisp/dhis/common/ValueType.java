@@ -112,7 +112,9 @@ public enum ValueType {
           .collect(Collectors.toUnmodifiableSet());
 
   /**
-   * https://github.com/pgjdbc/pgjdbc/blob/156d724e1d95052b41a19fb568b2f81919ae2197/pgjdbc/src/main/java/org/postgresql/jdbc/TypeInfoCache.java#L84
+   * @see <a href="https://www.postgresql.org/docs/current/datatype-numeric.html">PostgreSQL Numeric
+   *     Type</a>
+   *     <p>https://github.com/pgjdbc/pgjdbc/blob/156d724e1d95052b41a19fb568b2f81919ae2197/pgjdbc/src/main/java/org/postgresql/jdbc/TypeInfoCache.java#L84
    */
   public static final Map<Class<?>, SqlType<?>> JAVA_TO_SQL_TYPES =
       Map.of(
@@ -120,8 +122,7 @@ public enum ValueType {
           Double.class,
               new SqlType<>(
                   Types.NUMERIC, "numeric", java.math.BigDecimal.class, java.math.BigDecimal::new),
-          String.class,
-              new SqlType<String>(Types.VARCHAR, "text", String.class, Function.identity()));
+          String.class, new SqlType<>(Types.VARCHAR, "text", String.class, Function.identity()));
 
   public record SqlType<T>(
       int type,

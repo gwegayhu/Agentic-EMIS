@@ -38,7 +38,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.google.common.base.Strings;
 import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
@@ -62,7 +61,6 @@ import org.hisp.dhis.category.CategoryOption;
 import org.hisp.dhis.category.CategoryOptionCombo;
 import org.hisp.dhis.common.AssignedUserSelectionMode;
 import org.hisp.dhis.common.IdentifiableObjectManager;
-import org.hisp.dhis.common.QueryFilter;
 import org.hisp.dhis.common.UID;
 import org.hisp.dhis.common.ValueType;
 import org.hisp.dhis.common.ValueType.SqlType;
@@ -104,7 +102,6 @@ import org.locationtech.jts.io.ParseException;
 import org.locationtech.jts.io.WKTReader;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.RowCallbackHandler;
-import org.springframework.jdbc.core.SqlParameterValue;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -612,7 +609,7 @@ left join dataelement de on de.uid = eventdatavalue.dataelement_uid
   private String getWhereClauseFromAttributeFilterConditions(
       EventQueryParams params, MapSqlParameterSource sqlParameters, SqlHelper hlp) {
     StringBuilder fromBuilder = new StringBuilder();
-    for (Entry<TrackedEntityAttribute, List<QueryFilter>> queryItem :
+    for (Entry<TrackedEntityAttribute, List<QueryFilterValue>> queryItem :
         params.getAttributes().entrySet()) {
       TrackedEntityAttribute tea = queryItem.getKey();
 
@@ -629,7 +626,7 @@ left join dataelement de on de.uid = eventdatavalue.dataelement_uid
 
   @SneakyThrows
   private String mapFiltersToSql(
-      List<QueryFilter> filters,
+      List<QueryFilterValue> filters,
       ValueTypedDimensionalItemObject valueTypeObject,
       String column,
       MapSqlParameterSource sqlParameters) {
@@ -640,17 +637,16 @@ left join dataelement de on de.uid = eventdatavalue.dataelement_uid
     StringBuilder sql = new StringBuilder(AND + SPACE);
 
     for (int i = 0; i < filters.size(); i++) {
-      QueryFilter filter = filters.get(i);
+      QueryFilterValue filter = filters.get(i);
 
       String leftOperand = sqlLeftOperand(filter, valueTypeObject, column);
       String parameterKey = "filter_%s_%d".formatted(valueTypeObject.getUid(), i);
       String rightOperand = sqlRightOperand(filter, parameterKey);
       String filterString =
-          leftOperand + SPACE + filter.getSqlOperator() + SPACE + rightOperand + SPACE;
+          leftOperand + SPACE + filter.sqlOperator() + SPACE + rightOperand + SPACE;
 
-      if (filter.getOperator().isBinary()) {
-        SqlParameterValue sqlParameterValue = mapFilterToSqlParameterValue(filter, valueTypeObject);
-        sqlParameters.addValue(parameterKey, sqlParameterValue);
+      if (filter.operator().isBinary()) {
+        sqlParameters.addValue(parameterKey, filter.value());
       }
 
       sql.append(filterString);
@@ -664,17 +660,16 @@ left join dataelement de on de.uid = eventdatavalue.dataelement_uid
 
   @Nonnull
   private static String sqlLeftOperand(
-      QueryFilter filter, ValueTypedDimensionalItemObject valueTypedObject, String column) {
+      QueryFilterValue filter, ValueTypedDimensionalItemObject valueTypedObject, String column) {
     String leftOperand;
     // TODO(ivo) whats the difference in ev.eventdatavalues->'uid' is not null vs ev.eventdatavalues
     // #>> '{"uid", value}' is not null?
-    if (filter.getOperator().isUnary()) {
+    if (filter.operator().isUnary()) {
       // TODO(ivo) this might not be true for data elements, right?
       // lower() is not necessarily needed for unary operators but this will allow the DB to use
       // the index on lower(teav.value)
       leftOperand = lower(column);
-    } else if (valueTypedObject.getValueType().isNumeric()
-        && filter.getOperator().isCastOperand()) {
+    } else if (valueTypedObject.getValueType().isNumeric() && filter.operator().isCastOperand()) {
       SqlType sqlType =
           ValueType.JAVA_TO_SQL_TYPES.get(valueTypedObject.getValueType().getJavaClass());
       leftOperand = SqlUtils.cast(column, sqlType.postgresName());
@@ -687,76 +682,16 @@ left join dataelement de on de.uid = eventdatavalue.dataelement_uid
   }
 
   @Nonnull
-  private static String sqlRightOperand(QueryFilter filter, String parameterKey) {
-    if (filter.getOperator().isUnary()) {
+  private static String sqlRightOperand(QueryFilterValue filter, String parameterKey) {
+    if (filter.operator().isUnary()) {
       return "";
     }
 
-    if (filter.getOperator().isIn()) {
+    if (filter.operator().isIn()) {
       return "(:" + parameterKey + ")";
     }
 
     return ":" + parameterKey;
-  }
-
-  // TODO(ivo) make this pretty :joy:, maybe after figuring out where we will do our validation
-  @Nonnull
-  private static SqlParameterValue mapFilterToSqlParameterValue(
-      QueryFilter filter, ValueTypedDimensionalItemObject valueTypeObject)
-      throws InstantiationException,
-          IllegalAccessException,
-          InvocationTargetException,
-          NoSuchMethodException {
-    SqlParameterValue sqlParameterValue;
-    Object value;
-    if (valueTypeObject.getValueType().isNumeric() && filter.getOperator().isCastOperand()) {
-      // TODO(ivo) remove SneakyThrows but keep this readable
-      // but what does SqlBindFilter do and do we need it in the numeric case?
-      SqlType sqlType =
-          ValueType.JAVA_TO_SQL_TYPES.get(valueTypeObject.getValueType().getJavaClass());
-
-      // TODO(ivo) that here could be a function on operator, value type
-      // extract function
-      // (filter) -> SqlParameterValue
-      // then call addValue(String paramName, Object value)
-      if (filter.getOperator().isIn()) {
-        value =
-            QueryFilter.getFilterItems(filter.getFilter()).stream()
-                .map(
-                    s -> {
-                      try {
-                        return sqlType.postgresClass().getConstructor(String.class).newInstance(s);
-                      } catch (InstantiationException e) {
-                        throw new RuntimeException(e);
-                      } catch (IllegalAccessException e) {
-                        throw new RuntimeException(e);
-                      } catch (InvocationTargetException e) {
-                        throw new RuntimeException(e);
-                      } catch (NoSuchMethodException e) {
-                        throw new RuntimeException(e);
-                      }
-                    })
-                .toList();
-      } else {
-        value =
-            sqlType
-                .postgresClass()
-                .getConstructor(String.class)
-                .newInstance(filter.getSqlBindFilter());
-      }
-      sqlParameterValue = new SqlParameterValue(sqlType.type(), value);
-    } else {
-      if (filter.getOperator().isIn()) {
-        value =
-            QueryFilter.getFilterItems(filter.getFilter()).stream()
-                .map(StringUtils::lowerCase)
-                .toList();
-      } else {
-        value = StringUtils.lowerCase(filter.getSqlBindFilter());
-      }
-      sqlParameterValue = new SqlParameterValue(Types.VARCHAR, value);
-    }
-    return sqlParameterValue;
   }
 
   /**
@@ -1326,7 +1261,7 @@ left join dataelement de on de.uid = eventdatavalue.dataelement_uid
       EventQueryParams params, MapSqlParameterSource sqlParameters, StringBuilder selectBuilder) {
     StringBuilder sql = new StringBuilder();
 
-    for (Entry<DataElement, List<QueryFilter>> item : params.getDataElements().entrySet()) {
+    for (Entry<DataElement, List<QueryFilterValue>> item : params.getDataElements().entrySet()) {
       DataElement de = item.getKey();
       final String deUid = de.getUid();
       final String dataValueValueSql = "ev.eventdatavalues #>> '{" + deUid + ", value}'";

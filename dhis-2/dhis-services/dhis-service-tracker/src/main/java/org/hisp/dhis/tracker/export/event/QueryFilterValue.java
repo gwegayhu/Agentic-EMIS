@@ -32,25 +32,23 @@ package org.hisp.dhis.tracker.export.event;
 import java.sql.Types;
 import java.util.List;
 import javax.annotation.Nullable;
-import lombok.Value;
 import org.hisp.dhis.common.QueryFilter;
 import org.hisp.dhis.common.QueryOperator;
 import org.hisp.dhis.common.ValueType;
 import org.hisp.dhis.common.ValueTypedDimensionalItemObject;
 import org.springframework.jdbc.core.SqlParameterValue;
 
-@Value
-public class QueryFilterValue {
-  QueryOperator operator;
-
-  /** Unary operators have no value. */
-  @Nullable SqlParameterValue value;
-
+/**
+ * @param sqlOperator The SQL operator string to use in the query.
+ * @param value Unary operators have no value.
+ */
+record QueryFilterValue(
+    QueryOperator operator, String sqlOperator, @Nullable SqlParameterValue value) {
   @SuppressWarnings("unchecked")
   public static QueryFilterValue of(
       QueryFilter filter, ValueTypedDimensionalItemObject valueTypeObject) {
     if (filter.getOperator().isUnary()) {
-      return new QueryFilterValue(filter.getOperator(), null);
+      return new QueryFilterValue(filter.getOperator(), filter.getSqlOperator(), null);
     }
 
     List<String> values =
@@ -71,6 +69,7 @@ public class QueryFilterValue {
 
     return new QueryFilterValue(
         filter.getOperator(),
+        filter.getSqlOperator(),
         new SqlParameterValue(
             filter.getOperator().isIn() ? Types.ARRAY : sqlType.type(),
             filter.getOperator().isIn() ? convertedValue : ((List<?>) convertedValue).get(0)));
@@ -84,14 +83,12 @@ public class QueryFilterValue {
     try {
       return values.stream().map(value -> sqlType.producer().apply(value)).toList();
     } catch (Exception e) {
-      String name =
-          valueTypeObject instanceof org.hisp.dhis.trackedentity.TrackedEntityAttribute
-              ? "attribute"
-              : "data element";
       throw new IllegalArgumentException(
           String.format(
               "Filter for %s %s is invalid. Could not convert value `%s` to value type %s.",
-              name,
+              valueTypeObject instanceof org.hisp.dhis.trackedentity.TrackedEntityAttribute
+                  ? "attribute"
+                  : "data element",
               valueTypeObject.getUid(),
               filter.getFilter(),
               valueTypeObject.getValueType().name()));

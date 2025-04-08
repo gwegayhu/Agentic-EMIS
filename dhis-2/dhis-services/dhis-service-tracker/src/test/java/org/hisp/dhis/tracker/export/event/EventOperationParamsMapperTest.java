@@ -52,6 +52,7 @@ import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
+import java.sql.Types;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -97,6 +98,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.jdbc.core.SqlParameterValue;
 
 @ExtendWith(MockitoExtension.class)
 class EventOperationParamsMapperTest {
@@ -122,7 +124,7 @@ class EventOperationParamsMapperTest {
 
   @Mock private DataElementService dataElementService;
 
-  @Mock private OperationsParamsValidator operationsParamsValidator;
+  @Mock private OperationsParamsValidator paramsValidator;
 
   @InjectMocks private EventOperationParamsMapper mapper;
 
@@ -260,15 +262,24 @@ class EventOperationParamsMapperTest {
 
     EventQueryParams queryParams = mapper.map(operationParams, user);
 
-    Map<TrackedEntityAttribute, List<QueryFilter>> attributes = queryParams.getAttributes();
+    Map<TrackedEntityAttribute, List<QueryFilterValue>> attributes = queryParams.getAttributes();
     assertNotNull(attributes);
-    Map<TrackedEntityAttribute, List<QueryFilter>> expected =
-        Map.of(
-            tea1,
-            List.of(new QueryFilter(QueryOperator.EQ, "2")),
-            tea2,
-            List.of(new QueryFilter(QueryOperator.LIKE, "foo")));
-    assertEquals(expected, attributes);
+    assertEquals(2, attributes.size());
+
+    assertContainsOnly(List.of(tea1, tea2), attributes.keySet());
+
+    List<QueryFilterValue> tea1Filters = attributes.get(tea1);
+    assertEquals(1, tea1Filters.size());
+    assertQueryFilterValue(
+        tea1Filters.get(0), QueryOperator.EQ, "=", new SqlParameterValue(Types.INTEGER, 2));
+
+    List<QueryFilterValue> tea2Filters = attributes.get(tea2);
+    assertEquals(1, tea2Filters.size());
+    assertQueryFilterValue(
+        tea2Filters.get(0),
+        QueryOperator.LIKE,
+        "like",
+        new SqlParameterValue(Types.VARCHAR, "foo"));
   }
 
   @Test
@@ -374,15 +385,23 @@ class EventOperationParamsMapperTest {
 
     EventQueryParams queryParams = mapper.map(operationParams, user);
 
-    Map<DataElement, List<QueryFilter>> dataElements = queryParams.getDataElements();
+    Map<DataElement, List<QueryFilterValue>> dataElements = queryParams.getDataElements();
     assertNotNull(dataElements);
-    Map<DataElement, List<QueryFilter>> expected =
-        Map.of(
-            de1,
-            List.of(new QueryFilter(QueryOperator.EQ, "2"), new QueryFilter(QueryOperator.NNULL)),
-            de2,
-            List.of(new QueryFilter(QueryOperator.LIKE, "foo")));
-    assertEquals(expected, dataElements);
+
+    assertEquals(2, dataElements.size());
+
+    assertContainsOnly(List.of(de1, de2), dataElements.keySet());
+
+    List<QueryFilterValue> de1Filters = dataElements.get(de1);
+    assertEquals(2, de1Filters.size());
+    assertQueryFilterValue(
+        de1Filters.get(0), QueryOperator.EQ, "=", new SqlParameterValue(Types.INTEGER, 2));
+    assertQueryFilterValue(de1Filters.get(1), QueryOperator.NNULL, "is not null", null);
+
+    List<QueryFilterValue> de2Filters = dataElements.get(de2);
+    assertEquals(1, de2Filters.size());
+    assertQueryFilterValue(
+        de2Filters.get(0), QueryOperator.LIKE, "like", new SqlParameterValue(Types.VARCHAR, "foo"));
   }
 
   @Test
@@ -540,5 +559,20 @@ class EventOperationParamsMapperTest {
     user.setUserRoles(Set.of(userRole));
 
     return user;
+  }
+
+  private static void assertQueryFilterValue(
+      QueryFilterValue expected,
+      QueryOperator operator,
+      String sqlOperator,
+      SqlParameterValue value) {
+    assertEquals(operator, expected.operator());
+    assertEquals(sqlOperator, expected.sqlOperator());
+    if (value != null) {
+      assertEquals(value.getSqlType(), expected.value().getSqlType());
+      assertEquals(value.getValue(), expected.value().getValue());
+    } else {
+      assertNull(expected.value());
+    }
   }
 }

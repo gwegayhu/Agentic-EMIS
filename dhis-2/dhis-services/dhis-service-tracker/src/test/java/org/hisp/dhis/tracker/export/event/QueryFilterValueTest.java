@@ -30,8 +30,8 @@
 package org.hisp.dhis.tracker.export.event;
 
 import static org.hisp.dhis.test.utils.Assertions.assertContains;
-import static org.junit.Assert.assertNull;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.sql.Types;
@@ -39,6 +39,7 @@ import java.util.List;
 import org.hisp.dhis.common.QueryFilter;
 import org.hisp.dhis.common.QueryOperator;
 import org.hisp.dhis.common.ValueType;
+import org.hisp.dhis.dataelement.DataElement;
 import org.hisp.dhis.test.TestBase;
 import org.hisp.dhis.trackedentity.TrackedEntityAttribute;
 import org.junit.jupiter.api.BeforeEach;
@@ -60,10 +61,12 @@ class QueryFilterValueTest extends TestBase {
     tea1.setValueType(ValueType.NUMBER);
     QueryFilter filter = new QueryFilter(QueryOperator.EQ, "42.5");
 
-    SqlParameterValue sqlParameterValue = QueryFilterValue.of(filter, tea1).getValue();
+    QueryFilterValue filterValue = QueryFilterValue.of(filter, tea1);
+    SqlParameterValue sqlParameterValue = filterValue.value();
 
     assertEquals(Types.NUMERIC, sqlParameterValue.getSqlType());
     assertEquals(new java.math.BigDecimal("42.5"), sqlParameterValue.getValue());
+    assertEquals("=", filterValue.sqlOperator());
   }
 
   @Test
@@ -71,7 +74,8 @@ class QueryFilterValueTest extends TestBase {
     tea1.setValueType(ValueType.NUMBER);
     QueryFilter filter = new QueryFilter(QueryOperator.IN, "42.5;17.2;7");
 
-    SqlParameterValue sqlParameterValue = QueryFilterValue.of(filter, tea1).getValue();
+    QueryFilterValue filterValue = QueryFilterValue.of(filter, tea1);
+    SqlParameterValue sqlParameterValue = filterValue.value();
 
     assertEquals(Types.ARRAY, sqlParameterValue.getSqlType());
     @SuppressWarnings("unchecked")
@@ -82,6 +86,7 @@ class QueryFilterValueTest extends TestBase {
             new java.math.BigDecimal("17.2"),
             new java.math.BigDecimal("7")),
         values);
+    assertEquals("in", filterValue.sqlOperator());
   }
 
   @Test
@@ -89,10 +94,12 @@ class QueryFilterValueTest extends TestBase {
     tea1.setValueType(ValueType.INTEGER);
     QueryFilter filter = new QueryFilter(QueryOperator.EQ, "42");
 
-    SqlParameterValue sqlParameterValue = QueryFilterValue.of(filter, tea1).getValue();
+    QueryFilterValue filterValue = QueryFilterValue.of(filter, tea1);
+    SqlParameterValue sqlParameterValue = filterValue.value();
 
     assertEquals(Types.INTEGER, sqlParameterValue.getSqlType());
     assertEquals(42, sqlParameterValue.getValue());
+    assertEquals("=", filterValue.sqlOperator());
   }
 
   @Test
@@ -100,10 +107,12 @@ class QueryFilterValueTest extends TestBase {
     tea1.setValueType(ValueType.INTEGER);
     QueryFilter filter = new QueryFilter(QueryOperator.IN, "42;17;7");
 
-    SqlParameterValue sqlParameterValue = QueryFilterValue.of(filter, tea1).getValue();
+    QueryFilterValue filterValue = QueryFilterValue.of(filter, tea1);
+    SqlParameterValue sqlParameterValue = filterValue.value();
 
     assertEquals(Types.ARRAY, sqlParameterValue.getSqlType());
     assertEquals(List.of(42, 17, 7), sqlParameterValue.getValue());
+    assertEquals("in", filterValue.sqlOperator());
   }
 
   @Test
@@ -133,20 +142,24 @@ class QueryFilterValueTest extends TestBase {
   void shouldCreateSqlParameterValueForValueTypeText() {
     QueryFilter filter = new QueryFilter(QueryOperator.EQ, "summer day");
 
-    SqlParameterValue sqlParameterValue = QueryFilterValue.of(filter, tea1).getValue();
+    QueryFilterValue filterValue = QueryFilterValue.of(filter, tea1);
+    SqlParameterValue sqlParameterValue = filterValue.value();
 
     assertEquals(Types.VARCHAR, sqlParameterValue.getSqlType());
     assertEquals("summer day", sqlParameterValue.getValue());
+    assertEquals("=", filterValue.sqlOperator());
   }
 
   @Test
   void shouldCreateSqlParameterValueForValueTypeTextInValues() {
     QueryFilter filter = new QueryFilter(QueryOperator.IN, "summer;winter;spring");
 
-    SqlParameterValue sqlParameterValue = QueryFilterValue.of(filter, tea1).getValue();
+    QueryFilterValue filterValue = QueryFilterValue.of(filter, tea1);
+    SqlParameterValue sqlParameterValue = filterValue.value();
 
     assertEquals(Types.ARRAY, sqlParameterValue.getSqlType());
     assertEquals(List.of("summer", "winter", "spring"), sqlParameterValue.getValue());
+    assertEquals("in", filterValue.sqlOperator());
   }
 
   @Test
@@ -179,9 +192,11 @@ class QueryFilterValueTest extends TestBase {
     tea1.setValueType(ValueType.NUMBER);
     QueryFilter filter = new QueryFilter(QueryOperator.NNULL);
 
-    SqlParameterValue sqlParameterValue = QueryFilterValue.of(filter, tea1).getValue();
+    QueryFilterValue filterValue = QueryFilterValue.of(filter, tea1);
+    SqlParameterValue sqlParameterValue = filterValue.value();
 
     assertNull(sqlParameterValue);
+    assertEquals("is not null", filterValue.sqlOperator());
   }
 
   @Test
@@ -189,10 +204,12 @@ class QueryFilterValueTest extends TestBase {
     tea1.setValueType(ValueType.TEXT);
     QueryFilter filter = new QueryFilter(QueryOperator.EQ, "test");
 
-    SqlParameterValue sqlParameterValue = QueryFilterValue.of(filter, tea1).getValue();
+    QueryFilterValue filterValue = QueryFilterValue.of(filter, tea1);
+    SqlParameterValue sqlParameterValue = filterValue.value();
 
     assertEquals(Types.VARCHAR, sqlParameterValue.getSqlType());
     assertEquals("test", sqlParameterValue.getValue());
+    assertEquals("=", filterValue.sqlOperator());
   }
 
   @Test
@@ -200,12 +217,14 @@ class QueryFilterValueTest extends TestBase {
     tea1.setValueType(ValueType.TEXT);
     QueryFilter filter = new QueryFilter(QueryOperator.IN, "test1;test2;test3");
 
-    SqlParameterValue sqlParameterValue = QueryFilterValue.of(filter, tea1).getValue();
+    QueryFilterValue filterValue = QueryFilterValue.of(filter, tea1);
+    SqlParameterValue sqlParameterValue = filterValue.value();
 
     assertEquals(Types.ARRAY, sqlParameterValue.getSqlType());
     @SuppressWarnings("unchecked")
     List<Object> values = (List<Object>) sqlParameterValue.getValue();
     assertEquals(List.of("test1", "test2", "test3"), values);
+    assertEquals("in", filterValue.sqlOperator());
   }
 
   @Test
@@ -238,10 +257,12 @@ class QueryFilterValueTest extends TestBase {
     tea1.setValueType(ValueType.TEXT);
     QueryFilter filter = new QueryFilter(QueryOperator.EQ, "not-a-number");
 
-    SqlParameterValue sqlParameterValue = QueryFilterValue.of(filter, tea1).getValue();
+    QueryFilterValue filterValue = QueryFilterValue.of(filter, tea1);
+    SqlParameterValue sqlParameterValue = filterValue.value();
 
     assertEquals(Types.VARCHAR, sqlParameterValue.getSqlType());
     assertEquals("not-a-number", sqlParameterValue.getValue());
+    assertEquals("=", filterValue.sqlOperator());
   }
 
   @Test
@@ -249,8 +270,47 @@ class QueryFilterValueTest extends TestBase {
     tea1.setValueType(ValueType.NUMBER);
     QueryFilter filter = new QueryFilter(QueryOperator.NNULL, null);
 
-    SqlParameterValue sqlParameterValue = QueryFilterValue.of(filter, tea1).getValue();
+    QueryFilterValue filterValue = QueryFilterValue.of(filter, tea1);
+    SqlParameterValue sqlParameterValue = filterValue.value();
 
     assertNull(sqlParameterValue);
+    assertEquals("is not null", filterValue.sqlOperator());
+  }
+
+  @Test
+  void testSqlOperatorForUnaryOperator() {
+    DataElement de = new DataElement();
+    de.setValueType(ValueType.TEXT);
+    de.setUid("abc123");
+
+    QueryFilter filter = new QueryFilter(QueryOperator.NNULL);
+    QueryFilterValue value = QueryFilterValue.of(filter, de);
+
+    assertEquals("is not null", value.sqlOperator());
+    assertNull(value.value());
+  }
+
+  @Test
+  void testSqlOperatorForBinaryOperator() {
+    DataElement de = new DataElement();
+    de.setValueType(ValueType.TEXT);
+    de.setUid("abc123");
+
+    QueryFilter filter = new QueryFilter(QueryOperator.EQ, "test");
+    QueryFilterValue value = QueryFilterValue.of(filter, de);
+
+    assertEquals("=", value.sqlOperator());
+  }
+
+  @Test
+  void testSqlOperatorForInOperator() {
+    DataElement de = new DataElement();
+    de.setValueType(ValueType.TEXT);
+    de.setUid("abc123");
+
+    QueryFilter filter = new QueryFilter(QueryOperator.IN, "test1;test2");
+    QueryFilterValue value = QueryFilterValue.of(filter, de);
+
+    assertEquals("in", value.sqlOperator());
   }
 }
