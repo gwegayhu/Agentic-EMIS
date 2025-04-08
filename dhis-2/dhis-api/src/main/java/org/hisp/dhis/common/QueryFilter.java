@@ -183,7 +183,7 @@ public class QueryFilter {
     } else if (SW == operator) {
       return this.filter + "%";
     } else if (EW == operator) {
-      return "%" + this.filter + "";
+      return "%" + this.filter;
     }
 
     return this.filter;

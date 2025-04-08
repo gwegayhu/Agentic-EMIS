@@ -62,7 +62,6 @@ import org.hisp.dhis.category.CategoryOptionCombo;
 import org.hisp.dhis.common.AssignedUserSelectionMode;
 import org.hisp.dhis.common.IdentifiableObjectManager;
 import org.hisp.dhis.common.UID;
-import org.hisp.dhis.common.ValueType;
 import org.hisp.dhis.common.ValueType.SqlType;
 import org.hisp.dhis.common.ValueTypedDimensionalItemObject;
 import org.hisp.dhis.common.collection.CollectionUtils;
@@ -670,8 +669,7 @@ left join dataelement de on de.uid = eventdatavalue.dataelement_uid
       // the index on lower(teav.value)
       leftOperand = lower(column);
     } else if (valueTypedObject.getValueType().isNumeric() && filter.operator().isCastOperand()) {
-      SqlType sqlType =
-          ValueType.JAVA_TO_SQL_TYPES.get(valueTypedObject.getValueType().getJavaClass());
+      SqlType<?> sqlType = valueTypedObject.getValueType().getSqlType();
       leftOperand = SqlUtils.cast(column, sqlType.postgresName());
     } else {
       // this might change in the future as right now ieq and eq behave the same way which is

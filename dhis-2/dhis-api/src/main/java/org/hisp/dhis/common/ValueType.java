@@ -270,6 +270,18 @@ public enum ValueType {
   }
 
   /**
+   * Get the SQL type the data value's Java class maps to. Defaults to the {@code String.class}
+   * representation.
+   */
+  public SqlType<?> getSqlType() {
+    SqlType<?> sqlType = JAVA_TO_SQL_TYPES.get(javaClass);
+    if (sqlType == null) {
+      sqlType = JAVA_TO_SQL_TYPES.get(String.class);
+    }
+    return sqlType;
+  }
+
+  /**
    * Returns a valid ValueType based on the given SQL type.
    *
    * @see java.sql.Types for valid integer values.

@@ -77,7 +77,7 @@ class QueryFilterValueTest extends TestBase {
     QueryFilterValue filterValue = QueryFilterValue.of(filter, tea1);
     SqlParameterValue sqlParameterValue = filterValue.value();
 
-    assertEquals(Types.ARRAY, sqlParameterValue.getSqlType());
+    assertEquals(Types.NUMERIC, sqlParameterValue.getSqlType());
     @SuppressWarnings("unchecked")
     List<Object> values = (List<Object>) sqlParameterValue.getValue();
     assertEquals(
@@ -110,7 +110,7 @@ class QueryFilterValueTest extends TestBase {
     QueryFilterValue filterValue = QueryFilterValue.of(filter, tea1);
     SqlParameterValue sqlParameterValue = filterValue.value();
 
-    assertEquals(Types.ARRAY, sqlParameterValue.getSqlType());
+    assertEquals(Types.INTEGER, sqlParameterValue.getSqlType());
     assertEquals(List.of(42, 17, 7), sqlParameterValue.getValue());
     assertEquals("in", filterValue.sqlOperator());
   }
@@ -157,9 +157,45 @@ class QueryFilterValueTest extends TestBase {
     QueryFilterValue filterValue = QueryFilterValue.of(filter, tea1);
     SqlParameterValue sqlParameterValue = filterValue.value();
 
-    assertEquals(Types.ARRAY, sqlParameterValue.getSqlType());
+    assertEquals(Types.VARCHAR, sqlParameterValue.getSqlType());
     assertEquals(List.of("summer", "winter", "spring"), sqlParameterValue.getValue());
     assertEquals("in", filterValue.sqlOperator());
+  }
+
+  @Test
+  void shouldCreateSqlParameterValueForValueTypeTextAndOperatorLike() {
+    QueryFilter filter = new QueryFilter(QueryOperator.LIKE, "summer");
+
+    QueryFilterValue filterValue = QueryFilterValue.of(filter, tea1);
+    SqlParameterValue sqlParameterValue = filterValue.value();
+
+    assertEquals(Types.VARCHAR, sqlParameterValue.getSqlType());
+    assertEquals("%summer%", sqlParameterValue.getValue());
+    assertEquals("like", filterValue.sqlOperator());
+  }
+
+  @Test
+  void shouldCreateSqlParameterValueForValueTypeTextAndOperatorSW() {
+    QueryFilter filter = new QueryFilter(QueryOperator.SW, "summer");
+
+    QueryFilterValue filterValue = QueryFilterValue.of(filter, tea1);
+    SqlParameterValue sqlParameterValue = filterValue.value();
+
+    assertEquals(Types.VARCHAR, sqlParameterValue.getSqlType());
+    assertEquals("summer%", sqlParameterValue.getValue());
+    assertEquals("like", filterValue.sqlOperator());
+  }
+
+  @Test
+  void shouldCreateSqlParameterValueForValueTypeTextAndOperatorEW() {
+    QueryFilter filter = new QueryFilter(QueryOperator.EW, "summer");
+
+    QueryFilterValue filterValue = QueryFilterValue.of(filter, tea1);
+    SqlParameterValue sqlParameterValue = filterValue.value();
+
+    assertEquals(Types.VARCHAR, sqlParameterValue.getSqlType());
+    assertEquals("%summer", sqlParameterValue.getValue());
+    assertEquals("like", filterValue.sqlOperator());
   }
 
   @Test
@@ -220,7 +256,7 @@ class QueryFilterValueTest extends TestBase {
     QueryFilterValue filterValue = QueryFilterValue.of(filter, tea1);
     SqlParameterValue sqlParameterValue = filterValue.value();
 
-    assertEquals(Types.ARRAY, sqlParameterValue.getSqlType());
+    assertEquals(Types.VARCHAR, sqlParameterValue.getSqlType());
     @SuppressWarnings("unchecked")
     List<Object> values = (List<Object>) sqlParameterValue.getValue();
     assertEquals(List.of("test1", "test2", "test3"), values);

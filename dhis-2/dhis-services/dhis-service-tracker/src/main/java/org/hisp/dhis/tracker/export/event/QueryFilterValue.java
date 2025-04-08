@@ -29,7 +29,6 @@
  */
 package org.hisp.dhis.tracker.export.event;
 
-import java.sql.Types;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.hisp.dhis.common.QueryFilter;
@@ -53,17 +52,15 @@ record QueryFilterValue(
 
     List<String> values =
         filter.getOperator().isIn()
-            ? List.of(filter.getFilter().split(QueryFilter.OPTION_SEP))
-            : List.of(filter.getFilter());
+            ? List.of(filter.getSqlBindFilter().split(QueryFilter.OPTION_SEP))
+            : List.of(filter.getSqlBindFilter());
 
     ValueType.SqlType<Object> sqlType =
         (ValueType.SqlType<Object>) ValueType.JAVA_TO_SQL_TYPES.get(String.class);
     boolean needsConversion =
         filter.getOperator().isCastOperand() && valueTypeObject.getValueType().isNumeric();
     if (needsConversion) {
-      sqlType =
-          (ValueType.SqlType<Object>)
-              ValueType.JAVA_TO_SQL_TYPES.get(valueTypeObject.getValueType().getJavaClass());
+      sqlType = (ValueType.SqlType<Object>) valueTypeObject.getValueType().getSqlType();
     }
     Object convertedValue = convertValues(filter, valueTypeObject, sqlType, values);
 
@@ -71,7 +68,7 @@ record QueryFilterValue(
         filter.getOperator(),
         filter.getSqlOperator(),
         new SqlParameterValue(
-            filter.getOperator().isIn() ? Types.ARRAY : sqlType.type(),
+            sqlType.type(),
             filter.getOperator().isIn() ? convertedValue : ((List<?>) convertedValue).get(0)));
   }
 
