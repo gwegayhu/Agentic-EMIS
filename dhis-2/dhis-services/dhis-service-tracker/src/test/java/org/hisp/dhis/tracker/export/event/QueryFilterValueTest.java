@@ -33,7 +33,6 @@ import static org.hisp.dhis.test.utils.Assertions.assertContains;
 import static org.junit.Assert.assertNull;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.sql.Types;
 import java.util.List;
@@ -115,7 +114,7 @@ class QueryFilterValueTest extends TestBase {
     IllegalArgumentException exception =
         assertThrows(IllegalArgumentException.class, () -> QueryFilterValue.of(filter, tea1));
 
-    assertContains("value type is numeric but the value", exception.getMessage());
+    assertContains("Could not convert value `42.5` to value type INTEGER.", exception.getMessage());
   }
 
   @Test
@@ -126,7 +125,8 @@ class QueryFilterValueTest extends TestBase {
     IllegalArgumentException exception =
         assertThrows(IllegalArgumentException.class, () -> QueryFilterValue.of(filter, tea1));
 
-    assertContains("value type is numeric but the value", exception.getMessage());
+    assertContains(
+        "Could not convert value `42;17.5;7` to value type INTEGER.", exception.getMessage());
   }
 
   @Test
@@ -157,7 +157,8 @@ class QueryFilterValueTest extends TestBase {
     IllegalArgumentException exception =
         assertThrows(IllegalArgumentException.class, () -> QueryFilterValue.of(filter, tea1));
 
-    assertContains("value type is numeric but the value", exception.getMessage());
+    assertContains(
+        "Could not convert value `not a number` to value type NUMBER.", exception.getMessage());
   }
 
   @Test
@@ -168,7 +169,9 @@ class QueryFilterValueTest extends TestBase {
     IllegalArgumentException exception =
         assertThrows(IllegalArgumentException.class, () -> QueryFilterValue.of(filter, tea1));
 
-    assertContains("value type is numeric but the value", exception.getMessage());
+    assertContains(
+        "Could not convert value `42.5;not a number;7` to value type NUMBER.",
+        exception.getMessage());
   }
 
   @Test
@@ -213,9 +216,8 @@ class QueryFilterValueTest extends TestBase {
     IllegalArgumentException exception =
         assertThrows(IllegalArgumentException.class, () -> QueryFilterValue.of(filter, tea1));
 
-    assertTrue(exception.getMessage().contains("is invalid"));
-    assertTrue(exception.getMessage().contains("numeric"));
-    assertTrue(exception.getMessage().contains("not-a-number"));
+    assertContains(
+        "Could not convert value `not-a-number` to value type NUMBER.", exception.getMessage());
   }
 
   @Test
@@ -226,9 +228,9 @@ class QueryFilterValueTest extends TestBase {
     IllegalArgumentException exception =
         assertThrows(IllegalArgumentException.class, () -> QueryFilterValue.of(filter, tea1));
 
-    assertTrue(exception.getMessage().contains("is invalid"));
-    assertTrue(exception.getMessage().contains("numeric"));
-    assertTrue(exception.getMessage().contains("not-a-number"));
+    assertContains(
+        "Could not convert value `42.5;not-a-number;7` to value type NUMBER.",
+        exception.getMessage());
   }
 
   @Test

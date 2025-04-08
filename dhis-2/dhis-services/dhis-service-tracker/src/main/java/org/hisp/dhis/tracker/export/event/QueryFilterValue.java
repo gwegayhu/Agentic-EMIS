@@ -67,7 +67,7 @@ public class QueryFilterValue {
           (ValueType.SqlType<Object>)
               ValueType.JAVA_TO_SQL_TYPES.get(valueTypeObject.getValueType().getJavaClass());
     }
-    Object convertedValue = convertValues(sqlType, valueTypeObject, values);
+    Object convertedValue = convertValues(filter, valueTypeObject, sqlType, values);
 
     return new QueryFilterValue(
         filter.getOperator(),
@@ -77,46 +77,24 @@ public class QueryFilterValue {
   }
 
   private static Object convertValues(
-      ValueType.SqlType<Object> sqlType,
+      QueryFilter filter,
       ValueTypedDimensionalItemObject valueTypeObject,
+      ValueType.SqlType<Object> sqlType,
       List<String> values) {
     try {
-      return values.stream()
-          .map(
-              value -> {
-                try {
-                  return sqlType.producer().apply(value);
-                } catch (NumberFormatException e) {
-                  throw new IllegalArgumentException(
-                      String.format(
-                          "Filter for %s %s is invalid. The %s value type is numeric but the value `%s` is not.",
-                          valueTypeObject
-                                  instanceof org.hisp.dhis.trackedentity.TrackedEntityAttribute
-                              ? "attribute"
-                              : "data element",
-                          valueTypeObject.getUid(),
-                          valueTypeObject
-                                  instanceof org.hisp.dhis.trackedentity.TrackedEntityAttribute
-                              ? "attribute"
-                              : "data element",
-                          value));
-                }
-              })
-          .toList();
-    } catch (IllegalArgumentException e) {
-      throw e;
+      return values.stream().map(value -> sqlType.producer().apply(value)).toList();
     } catch (Exception e) {
+      String name =
+          valueTypeObject instanceof org.hisp.dhis.trackedentity.TrackedEntityAttribute
+              ? "attribute"
+              : "data element";
       throw new IllegalArgumentException(
           String.format(
-              "Filter for %s %s is invalid. The %s value type is numeric but the value `%s` is not.",
-              valueTypeObject instanceof org.hisp.dhis.trackedentity.TrackedEntityAttribute
-                  ? "attribute"
-                  : "data element",
+              "Filter for %s %s is invalid. Could not convert value `%s` to value type %s.",
+              name,
               valueTypeObject.getUid(),
-              valueTypeObject instanceof org.hisp.dhis.trackedentity.TrackedEntityAttribute
-                  ? "attribute"
-                  : "data element",
-              String.join(QueryFilter.OPTION_SEP, values)));
+              filter.getFilter(),
+              valueTypeObject.getValueType().name()));
     }
   }
 }
