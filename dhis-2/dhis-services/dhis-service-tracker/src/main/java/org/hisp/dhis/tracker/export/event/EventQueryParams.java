@@ -461,7 +461,7 @@ class EventQueryParams {
   public EventQueryParams filterBy(
       @Nonnull TrackedEntityAttribute tea, @Nonnull QueryFilter filter) {
     this.attributes.putIfAbsent(tea, new ArrayList<>());
-    this.attributes.get(tea).add(QueryFilterValue.of(filter, tea));
+    this.attributes.get(tea).add(QueryFilterValue.of(tea, filter));
     return this;
   }
 
@@ -472,14 +472,14 @@ class EventQueryParams {
 
   public EventQueryParams filterBy(@Nonnull DataElement de, @Nonnull QueryFilter filter) {
     this.dataElements.putIfAbsent(de, new ArrayList<>());
-    this.dataElements.get(de).add(QueryFilterValue.of(filter, de));
+    this.dataElements.get(de).add(QueryFilterValue.of(de, filter));
     this.hasDataElementFilter = true;
     return this;
   }
 
   public EventQueryParams filterBy(DataElement de) {
     this.dataElements.putIfAbsent(
-        de, List.of(QueryFilterValue.of(new QueryFilter(QueryOperator.NNULL), de)));
+        de, List.of(QueryFilterValue.of(de, new QueryFilter(QueryOperator.NNULL))));
     return this;
   }
 

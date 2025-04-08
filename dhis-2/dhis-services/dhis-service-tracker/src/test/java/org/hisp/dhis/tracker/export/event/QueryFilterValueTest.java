@@ -61,7 +61,7 @@ class QueryFilterValueTest extends TestBase {
     tea1.setValueType(ValueType.NUMBER);
     QueryFilter filter = new QueryFilter(QueryOperator.EQ, "42.5");
 
-    QueryFilterValue filterValue = QueryFilterValue.of(filter, tea1);
+    QueryFilterValue filterValue = QueryFilterValue.of(tea1, filter);
     SqlParameterValue sqlParameterValue = filterValue.value();
 
     assertEquals(Types.NUMERIC, sqlParameterValue.getSqlType());
@@ -74,7 +74,7 @@ class QueryFilterValueTest extends TestBase {
     tea1.setValueType(ValueType.NUMBER);
     QueryFilter filter = new QueryFilter(QueryOperator.IN, "42.5;17.2;7");
 
-    QueryFilterValue filterValue = QueryFilterValue.of(filter, tea1);
+    QueryFilterValue filterValue = QueryFilterValue.of(tea1, filter);
     SqlParameterValue sqlParameterValue = filterValue.value();
 
     assertEquals(Types.NUMERIC, sqlParameterValue.getSqlType());
@@ -94,7 +94,7 @@ class QueryFilterValueTest extends TestBase {
     tea1.setValueType(ValueType.INTEGER);
     QueryFilter filter = new QueryFilter(QueryOperator.EQ, "42");
 
-    QueryFilterValue filterValue = QueryFilterValue.of(filter, tea1);
+    QueryFilterValue filterValue = QueryFilterValue.of(tea1, filter);
     SqlParameterValue sqlParameterValue = filterValue.value();
 
     assertEquals(Types.INTEGER, sqlParameterValue.getSqlType());
@@ -107,7 +107,7 @@ class QueryFilterValueTest extends TestBase {
     tea1.setValueType(ValueType.INTEGER);
     QueryFilter filter = new QueryFilter(QueryOperator.IN, "42;17;7");
 
-    QueryFilterValue filterValue = QueryFilterValue.of(filter, tea1);
+    QueryFilterValue filterValue = QueryFilterValue.of(tea1, filter);
     SqlParameterValue sqlParameterValue = filterValue.value();
 
     assertEquals(Types.INTEGER, sqlParameterValue.getSqlType());
@@ -121,7 +121,7 @@ class QueryFilterValueTest extends TestBase {
     QueryFilter filter = new QueryFilter(QueryOperator.EQ, "42.5");
 
     IllegalArgumentException exception =
-        assertThrows(IllegalArgumentException.class, () -> QueryFilterValue.of(filter, tea1));
+        assertThrows(IllegalArgumentException.class, () -> QueryFilterValue.of(tea1, filter));
 
     assertContains("Could not convert value `42.5` to value type INTEGER.", exception.getMessage());
   }
@@ -132,7 +132,7 @@ class QueryFilterValueTest extends TestBase {
     QueryFilter filter = new QueryFilter(QueryOperator.IN, "42;17.5;7");
 
     IllegalArgumentException exception =
-        assertThrows(IllegalArgumentException.class, () -> QueryFilterValue.of(filter, tea1));
+        assertThrows(IllegalArgumentException.class, () -> QueryFilterValue.of(tea1, filter));
 
     assertContains(
         "Could not convert value `42;17.5;7` to value type INTEGER.", exception.getMessage());
@@ -142,7 +142,7 @@ class QueryFilterValueTest extends TestBase {
   void shouldCreateSqlParameterValueForValueTypeText() {
     QueryFilter filter = new QueryFilter(QueryOperator.EQ, "summer day");
 
-    QueryFilterValue filterValue = QueryFilterValue.of(filter, tea1);
+    QueryFilterValue filterValue = QueryFilterValue.of(tea1, filter);
     SqlParameterValue sqlParameterValue = filterValue.value();
 
     assertEquals(Types.VARCHAR, sqlParameterValue.getSqlType());
@@ -154,7 +154,7 @@ class QueryFilterValueTest extends TestBase {
   void shouldCreateSqlParameterValueForValueTypeTextInValues() {
     QueryFilter filter = new QueryFilter(QueryOperator.IN, "summer;winter;spring");
 
-    QueryFilterValue filterValue = QueryFilterValue.of(filter, tea1);
+    QueryFilterValue filterValue = QueryFilterValue.of(tea1, filter);
     SqlParameterValue sqlParameterValue = filterValue.value();
 
     assertEquals(Types.VARCHAR, sqlParameterValue.getSqlType());
@@ -166,7 +166,7 @@ class QueryFilterValueTest extends TestBase {
   void shouldCreateSqlParameterValueForValueTypeTextAndOperatorLike() {
     QueryFilter filter = new QueryFilter(QueryOperator.LIKE, "summer");
 
-    QueryFilterValue filterValue = QueryFilterValue.of(filter, tea1);
+    QueryFilterValue filterValue = QueryFilterValue.of(tea1, filter);
     SqlParameterValue sqlParameterValue = filterValue.value();
 
     assertEquals(Types.VARCHAR, sqlParameterValue.getSqlType());
@@ -178,7 +178,7 @@ class QueryFilterValueTest extends TestBase {
   void shouldCreateSqlParameterValueForValueTypeTextAndOperatorSW() {
     QueryFilter filter = new QueryFilter(QueryOperator.SW, "summer");
 
-    QueryFilterValue filterValue = QueryFilterValue.of(filter, tea1);
+    QueryFilterValue filterValue = QueryFilterValue.of(tea1, filter);
     SqlParameterValue sqlParameterValue = filterValue.value();
 
     assertEquals(Types.VARCHAR, sqlParameterValue.getSqlType());
@@ -190,7 +190,7 @@ class QueryFilterValueTest extends TestBase {
   void shouldCreateSqlParameterValueForValueTypeTextAndOperatorEW() {
     QueryFilter filter = new QueryFilter(QueryOperator.EW, "summer");
 
-    QueryFilterValue filterValue = QueryFilterValue.of(filter, tea1);
+    QueryFilterValue filterValue = QueryFilterValue.of(tea1, filter);
     SqlParameterValue sqlParameterValue = filterValue.value();
 
     assertEquals(Types.VARCHAR, sqlParameterValue.getSqlType());
@@ -204,7 +204,7 @@ class QueryFilterValueTest extends TestBase {
     QueryFilter filter = new QueryFilter(QueryOperator.EQ, "not a number");
 
     IllegalArgumentException exception =
-        assertThrows(IllegalArgumentException.class, () -> QueryFilterValue.of(filter, tea1));
+        assertThrows(IllegalArgumentException.class, () -> QueryFilterValue.of(tea1, filter));
 
     assertContains(
         "Could not convert value `not a number` to value type NUMBER.", exception.getMessage());
@@ -216,7 +216,7 @@ class QueryFilterValueTest extends TestBase {
     QueryFilter filter = new QueryFilter(QueryOperator.IN, "42.5;not a number;7");
 
     IllegalArgumentException exception =
-        assertThrows(IllegalArgumentException.class, () -> QueryFilterValue.of(filter, tea1));
+        assertThrows(IllegalArgumentException.class, () -> QueryFilterValue.of(tea1, filter));
 
     assertContains(
         "Could not convert value `42.5;not a number;7` to value type NUMBER.",
@@ -228,7 +228,7 @@ class QueryFilterValueTest extends TestBase {
     tea1.setValueType(ValueType.NUMBER);
     QueryFilter filter = new QueryFilter(QueryOperator.NNULL);
 
-    QueryFilterValue filterValue = QueryFilterValue.of(filter, tea1);
+    QueryFilterValue filterValue = QueryFilterValue.of(tea1, filter);
     SqlParameterValue sqlParameterValue = filterValue.value();
 
     assertNull(sqlParameterValue);
@@ -240,7 +240,7 @@ class QueryFilterValueTest extends TestBase {
     tea1.setValueType(ValueType.TEXT);
     QueryFilter filter = new QueryFilter(QueryOperator.EQ, "test");
 
-    QueryFilterValue filterValue = QueryFilterValue.of(filter, tea1);
+    QueryFilterValue filterValue = QueryFilterValue.of(tea1, filter);
     SqlParameterValue sqlParameterValue = filterValue.value();
 
     assertEquals(Types.VARCHAR, sqlParameterValue.getSqlType());
@@ -253,7 +253,7 @@ class QueryFilterValueTest extends TestBase {
     tea1.setValueType(ValueType.TEXT);
     QueryFilter filter = new QueryFilter(QueryOperator.IN, "test1;test2;test3");
 
-    QueryFilterValue filterValue = QueryFilterValue.of(filter, tea1);
+    QueryFilterValue filterValue = QueryFilterValue.of(tea1, filter);
     SqlParameterValue sqlParameterValue = filterValue.value();
 
     assertEquals(Types.VARCHAR, sqlParameterValue.getSqlType());
@@ -269,7 +269,7 @@ class QueryFilterValueTest extends TestBase {
     QueryFilter filter = new QueryFilter(QueryOperator.EQ, "not-a-number");
 
     IllegalArgumentException exception =
-        assertThrows(IllegalArgumentException.class, () -> QueryFilterValue.of(filter, tea1));
+        assertThrows(IllegalArgumentException.class, () -> QueryFilterValue.of(tea1, filter));
 
     assertContains(
         "Could not convert value `not-a-number` to value type NUMBER.", exception.getMessage());
@@ -281,7 +281,7 @@ class QueryFilterValueTest extends TestBase {
     QueryFilter filter = new QueryFilter(QueryOperator.IN, "42.5;not-a-number;7");
 
     IllegalArgumentException exception =
-        assertThrows(IllegalArgumentException.class, () -> QueryFilterValue.of(filter, tea1));
+        assertThrows(IllegalArgumentException.class, () -> QueryFilterValue.of(tea1, filter));
 
     assertContains(
         "Could not convert value `42.5;not-a-number;7` to value type NUMBER.",
@@ -293,7 +293,7 @@ class QueryFilterValueTest extends TestBase {
     tea1.setValueType(ValueType.TEXT);
     QueryFilter filter = new QueryFilter(QueryOperator.EQ, "not-a-number");
 
-    QueryFilterValue filterValue = QueryFilterValue.of(filter, tea1);
+    QueryFilterValue filterValue = QueryFilterValue.of(tea1, filter);
     SqlParameterValue sqlParameterValue = filterValue.value();
 
     assertEquals(Types.VARCHAR, sqlParameterValue.getSqlType());
@@ -306,7 +306,7 @@ class QueryFilterValueTest extends TestBase {
     tea1.setValueType(ValueType.NUMBER);
     QueryFilter filter = new QueryFilter(QueryOperator.NNULL, null);
 
-    QueryFilterValue filterValue = QueryFilterValue.of(filter, tea1);
+    QueryFilterValue filterValue = QueryFilterValue.of(tea1, filter);
     SqlParameterValue sqlParameterValue = filterValue.value();
 
     assertNull(sqlParameterValue);
@@ -320,7 +320,7 @@ class QueryFilterValueTest extends TestBase {
     de.setUid("abc123");
 
     QueryFilter filter = new QueryFilter(QueryOperator.NNULL);
-    QueryFilterValue value = QueryFilterValue.of(filter, de);
+    QueryFilterValue value = QueryFilterValue.of(de, filter);
 
     assertEquals("is not null", value.sqlOperator());
     assertNull(value.value());
@@ -333,7 +333,7 @@ class QueryFilterValueTest extends TestBase {
     de.setUid("abc123");
 
     QueryFilter filter = new QueryFilter(QueryOperator.EQ, "test");
-    QueryFilterValue value = QueryFilterValue.of(filter, de);
+    QueryFilterValue value = QueryFilterValue.of(de, filter);
 
     assertEquals("=", value.sqlOperator());
   }
@@ -345,7 +345,7 @@ class QueryFilterValueTest extends TestBase {
     de.setUid("abc123");
 
     QueryFilter filter = new QueryFilter(QueryOperator.IN, "test1;test2");
-    QueryFilterValue value = QueryFilterValue.of(filter, de);
+    QueryFilterValue value = QueryFilterValue.of(de, filter);
 
     assertEquals("in", value.sqlOperator());
   }

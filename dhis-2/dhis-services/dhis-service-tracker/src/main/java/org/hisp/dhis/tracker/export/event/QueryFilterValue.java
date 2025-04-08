@@ -45,7 +45,7 @@ record QueryFilterValue(
     QueryOperator operator, String sqlOperator, @Nullable SqlParameterValue value) {
   @SuppressWarnings("unchecked")
   public static QueryFilterValue of(
-      QueryFilter filter, ValueTypedDimensionalItemObject valueTypeObject) {
+      ValueTypedDimensionalItemObject valueTypeObject, QueryFilter filter) {
     if (filter.getOperator().isUnary()) {
       return new QueryFilterValue(filter.getOperator(), filter.getSqlOperator(), null);
     }
