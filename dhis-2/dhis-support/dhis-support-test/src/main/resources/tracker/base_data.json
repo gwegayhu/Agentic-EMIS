@@ -97,7 +97,7 @@
             "idScheme": "UID",
             "identifier": "toUpdate000"
           },
-          "value": "rainy day"
+          "value": "%rainy day"
         },
         {
           "valueType": "TEXT",
@@ -105,7 +105,7 @@
             "idScheme": "UID",
             "identifier": "notUpdated0"
           },
-          "value": "winter day"
+          "value": "winter day'"
         },
         {
           "valueType": "INTEGER",

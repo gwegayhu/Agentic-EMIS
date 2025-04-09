@@ -45,6 +45,7 @@ import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.hisp.dhis.category.CategoryOption;
@@ -77,6 +78,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.function.Executable;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -85,6 +88,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class EventExporterTest extends PostgresIntegrationTestBase {
+  @Autowired private NamedParameterJdbcTemplate jdbcTemplate;
+
   @Autowired private TestSetup testSetup;
 
   @Autowired private EventService eventService;
@@ -130,6 +135,66 @@ class EventExporterTest extends PostgresIntegrationTestBase {
 
     operationParamsBuilder = EventOperationParams.builder().eventParams(EventParams.FALSE);
     operationParamsBuilder.orgUnit(orgUnit).orgUnitMode(SELECTED);
+  }
+
+  @Test
+  void foo() {
+    // the jdbc driver does not do any escaping of like wildcard characters as it cannot know
+    // whether it should be treated as a wildcard or literal character
+    MapSqlParameterSource params = new MapSqlParameterSource();
+    params.addValue("filter", "%rainy%");
+    List<Map<String, Object>> maps =
+        jdbcTemplate.queryForList(
+            """
+        select teav.value from trackedentityattributevalue teav where teav.value like :filter
+        """,
+            params);
+
+    // we thus need to escape like wildcards ourselves
+    params = new MapSqlParameterSource();
+    params.addValue("filter", "\\%rainy%");
+    maps =
+        jdbcTemplate.queryForList(
+            """
+        select teav.value from trackedentityattributevalue teav where teav.value like :filter
+        """,
+            params);
+    System.out.println(maps);
+
+    // quotes and backslashes are escaped by the jdbc driver
+    params = new MapSqlParameterSource();
+    params.addValue("filter", "winter day'");
+    maps =
+        jdbcTemplate.queryForList(
+            """
+        select teav.value from trackedentityattributevalue teav where teav.value = :filter
+        """,
+            params);
+    System.out.println(maps);
+
+    // we pass a list with one value to an operator only expecting a single value
+    params = new MapSqlParameterSource();
+    params.addValue("filter", List.of("winter day'"));
+    maps =
+        jdbcTemplate.queryForList(
+            """
+        select teav.value from trackedentityattributevalue teav where teav.value = :filter
+        """,
+            params);
+    System.out.println(maps);
+
+    // (obvious) we CANNOT pass a list with more than one value to an operator expecting only one.
+    // org.springframework.jdbc.BadSqlGrammarException: PreparedStatementCallback; bad SQL grammar
+    // select teav.value from trackedentityattributevalue teav where teav.value = ?, ?
+    params = new MapSqlParameterSource();
+    params.addValue("filter", List.of("winter day'", "summer day"));
+    maps =
+        jdbcTemplate.queryForList(
+            """
+        select teav.value from trackedentityattributevalue teav where teav.value = :filter
+        """,
+            params);
+    System.out.println(maps);
   }
 
   @Test
