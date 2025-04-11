@@ -86,8 +86,9 @@ import org.hisp.dhis.tracker.Page;
 import org.hisp.dhis.tracker.PageParams;
 import org.hisp.dhis.tracker.TrackerIdScheme;
 import org.hisp.dhis.tracker.TrackerIdSchemeParam;
+import org.hisp.dhis.tracker.export.JdbcPredicate;
+import org.hisp.dhis.tracker.export.JdbcPredicate.Parameter;
 import org.hisp.dhis.tracker.export.Order;
-import org.hisp.dhis.tracker.export.event.JdbcPredicate.Parameter;
 import org.hisp.dhis.user.CurrentUserUtil;
 import org.hisp.dhis.user.User;
 import org.hisp.dhis.user.UserDetails;
@@ -621,7 +622,7 @@ left join dataelement de on de.uid = eventdatavalue.dataelement_uid
       return "";
     }
 
-    StringBuilder sql = new StringBuilder(AND + SPACE);
+    StringBuilder sql = new StringBuilder(AND);
 
     for (int i = 0; i < filters.size(); i++) {
       JdbcPredicate filter = filters.get(i);
@@ -633,7 +634,7 @@ left join dataelement de on de.uid = eventdatavalue.dataelement_uid
 
       sql.append(filter.sql());
       if (i + 1 < filters.size()) {
-        sql.append(SPACE + AND + SPACE);
+        sql.append(AND);
       }
     }
 

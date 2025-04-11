@@ -67,11 +67,14 @@ import org.hisp.dhis.trackedentity.TrackedEntity;
 import org.hisp.dhis.trackedentity.TrackedEntityAttribute;
 import org.hisp.dhis.tracker.Page;
 import org.hisp.dhis.tracker.PageParams;
+import org.hisp.dhis.tracker.export.JdbcPredicate;
+import org.hisp.dhis.tracker.export.JdbcPredicate.Parameter;
 import org.hisp.dhis.tracker.export.Order;
 import org.hisp.dhis.user.UserDetails;
 import org.hisp.dhis.util.DateUtils;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.support.rowset.SqlRowSet;
 import org.springframework.stereotype.Component;
 
@@ -83,6 +86,8 @@ class HibernateTrackedEntityStore extends SoftDeleteHibernateObjectStore<Tracked
   private static final String ENROLLMENT_ALIAS = "en";
 
   private static final String DEFAULT_ORDER = MAIN_QUERY_ALIAS + ".trackedentityid desc";
+
+  private static final String AND = " AND ";
 
   private static final String OFFSET = "OFFSET";
 
@@ -825,6 +830,30 @@ class HibernateTrackedEntityStore extends SoftDeleteHibernateObjectStore<Tracked
     }
 
     return filterClause.toString();
+  }
+
+  private String mapFiltersToSql(List<JdbcPredicate> filters, MapSqlParameterSource sqlParameters) {
+    if (filters.isEmpty()) {
+      return "";
+    }
+
+    StringBuilder sql = new StringBuilder(AND + SPACE);
+
+    for (int i = 0; i < filters.size(); i++) {
+      JdbcPredicate filter = filters.get(i);
+
+      filter
+          .parameter()
+          .ifPresent(
+              (Parameter parameter) -> sqlParameters.addValue(parameter.name(), parameter.value()));
+
+      sql.append(filter.sql());
+      if (i + 1 < filters.size()) {
+        sql.append(SPACE + AND + SPACE);
+      }
+    }
+
+    return sql + SPACE;
   }
 
   /**

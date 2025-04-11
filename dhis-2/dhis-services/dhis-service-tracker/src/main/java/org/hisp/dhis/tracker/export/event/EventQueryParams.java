@@ -58,6 +58,7 @@ import org.hisp.dhis.program.ProgramType;
 import org.hisp.dhis.trackedentity.TrackedEntity;
 import org.hisp.dhis.trackedentity.TrackedEntityAttribute;
 import org.hisp.dhis.tracker.TrackerIdSchemeParams;
+import org.hisp.dhis.tracker.export.JdbcPredicate;
 import org.hisp.dhis.tracker.export.Order;
 
 /**

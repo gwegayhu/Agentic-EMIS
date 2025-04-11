@@ -27,7 +27,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.hisp.dhis.tracker.export.event;
+package org.hisp.dhis.tracker.export;
 
 import static org.hisp.dhis.common.QueryFilter.affixLikeWildcards;
 import static org.hisp.dhis.system.util.SqlUtils.escapeLikeWildcards;
@@ -81,8 +81,8 @@ import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
  * JdbcPredicate ensures we never pass a collection with multiple elements to such operators as this
  * leads to a {@code BadSqlGrammarException}.
  */
-record JdbcPredicate(String sql, Optional<Parameter> parameter) {
-  record Parameter(String name, SqlParameterValue value) {}
+public record JdbcPredicate(String sql, Optional<Parameter> parameter) {
+  public record Parameter(String name, SqlParameterValue value) {}
 
   public static JdbcPredicate of(@Nonnull TrackedEntityAttribute tea, @Nonnull QueryFilter filter) {
     Parameter parameter = parseFilterValue(tea, filter);
