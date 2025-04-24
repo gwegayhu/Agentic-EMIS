@@ -60,19 +60,6 @@ public class RelationshipItemFields {
   private final boolean includesEvent;
   private final EventFields eventFields;
 
-  private RelationshipItemFields(Builder builder) {
-    this.includesTrackedEntity = builder.includesTrackedEntity;
-    this.trackedEntityFields =
-        builder.includesTrackedEntity ? builder.trackedEntityFields : TrackedEntityFields.none();
-
-    this.includesEnrollment = builder.includesEnrollment;
-    this.enrollmentFields =
-        builder.includesEnrollment ? builder.enrollmentFields : EnrollmentFields.none();
-
-    this.includesEvent = builder.includesEvent;
-    this.eventFields = builder.includesEvent ? builder.eventFields : EventFields.none();
-  }
-
   private RelationshipItemFields(Predicate<String> includesFields, String pathSeparator) {
     if (includesFields.test("trackedEntity")) {
       this.trackedEntityFields =
@@ -120,45 +107,71 @@ public class RelationshipItemFields {
     return new RelationshipItemFields(f -> true, "x");
   }
 
-  public static Builder builder() {
-    return new Builder();
+  @Getter
+  @ToString
+  @EqualsAndHashCode
+  public static class TrackedEntityFields {
+    private final boolean includesAttributes;
+    private final boolean includesEnrollments;
+    // Add other fields as needed
+
+    private TrackedEntityFields(Predicate<String> includesFields, String pathSeparator) {
+      this.includesAttributes = includesFields.test("attributes");
+      this.includesEnrollments = includesFields.test("enrollments");
+    }
+
+    public static TrackedEntityFields of(
+        @Nonnull Predicate<String> includesFields, @Nonnull String pathSeparator) {
+      return new TrackedEntityFields(includesFields, pathSeparator);
+    }
+
+    public static TrackedEntityFields none() {
+      return new TrackedEntityFields(f -> false, "x");
+    }
   }
 
-  public static class Builder {
-    private boolean includesTrackedEntity;
-    private TrackedEntityFields trackedEntityFields;
+  @Getter
+  @ToString
+  @EqualsAndHashCode
+  public static class EnrollmentFields {
+    private final boolean includesEvents;
+    private final boolean includesAttributes;
+    // Add other fields as needed
 
-    private boolean includesEnrollment;
-    private EnrollmentFields enrollmentFields;
-
-    private boolean includesEvent;
-    private EventFields eventFields;
-
-    private Builder() {}
-
-    /** Indicates that the trackedEntity should be exported with the given {@code fields}. */
-    public Builder includeTrackedEntity(@Nonnull TrackedEntityFields fields) {
-      this.includesTrackedEntity = true;
-      this.trackedEntityFields = fields;
-      return this;
+    private EnrollmentFields(Predicate<String> includesFields, String pathSeparator) {
+      this.includesEvents = includesFields.test("events");
+      this.includesAttributes = includesFields.test("attributes");
     }
 
-    /** Indicates that the enrollment should be exported with the given {@code fields}. */
-    public Builder includeEnrollment(@Nonnull EnrollmentFields fields) {
-      this.includesEnrollment = true;
-      this.enrollmentFields = fields;
-      return this;
+    public static EnrollmentFields of(
+        @Nonnull Predicate<String> includesFields, @Nonnull String pathSeparator) {
+      return new EnrollmentFields(includesFields, pathSeparator);
     }
 
-    /** Indicates that the event should be exported with the given {@code fields}. */
-    public Builder includeEvent(@Nonnull EventFields fields) {
-      this.includesEvent = true;
-      this.eventFields = fields;
-      return this;
+    public static EnrollmentFields none() {
+      return new EnrollmentFields(f -> false, "x");
+    }
+  }
+
+  @Getter
+  @ToString
+  @EqualsAndHashCode
+  public static class EventFields {
+    private final boolean includesNotes;
+    private final boolean includesDataValues;
+    // Add other fields as needed
+
+    private EventFields(Predicate<String> includesFields) {
+      this.includesNotes = includesFields.test("notes");
+      this.includesDataValues = includesFields.test("dataValues");
     }
 
-    public RelationshipItemFields build() {
-      return new RelationshipItemFields(this);
+    public static EventFields of(@Nonnull Predicate<String> includesFields) {
+      return new EventFields(includesFields);
+    }
+
+    public static EventFields none() {
+      return new EventFields(f -> false);
     }
   }
 }
