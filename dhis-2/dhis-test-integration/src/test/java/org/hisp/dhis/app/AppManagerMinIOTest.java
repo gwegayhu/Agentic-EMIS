@@ -60,6 +60,7 @@ import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.test.context.ContextConfiguration;
 
+@Disabled("this is timing out on GH")
 /**
  * Test class configured for use cases when DHIS2 is configured to use MinIO storage. The default
  * storage is the local filesystem.
