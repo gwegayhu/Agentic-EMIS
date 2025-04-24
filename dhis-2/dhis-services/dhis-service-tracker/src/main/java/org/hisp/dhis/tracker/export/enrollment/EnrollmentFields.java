@@ -85,7 +85,7 @@ public class EnrollmentFields {
     return new EnrollmentFields(f -> false, "x");
   }
 
-  /** Use this if you do want fields to be exported. This is potentially expensive! */
+  /** Use this if you do want all fields to be exported. This is potentially expensive! */
   public static EnrollmentFields all() {
     // the path separator does not matter as the predicate returns true regardless of the path
     return new EnrollmentFields(f -> true, "x");

@@ -91,7 +91,7 @@ public class TrackedEntityFields {
     return new TrackedEntityFields(f -> false, "x");
   }
 
-  /** Use this if you do want fields to be exported. This is potentially expensive! */
+  /** Use this if you do want all fields to be exported. This is potentially expensive! */
   public static TrackedEntityFields all() {
     // the path separator does not matter as the predicate returns true regardless of the path
     return new TrackedEntityFields(f -> true, "x");

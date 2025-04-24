@@ -36,7 +36,7 @@ import lombok.Getter;
 import lombok.ToString;
 
 /**
- * EventFields indicates which of the tracked entity fields should be exported. This is used to save
+ * EventFields indicates which of the event fields should be exported. This is used to save
  * retrieval of data that is not needed. Be specific in what you need to save resources!
  */
 @Getter
@@ -62,7 +62,7 @@ public class EventFields {
     return new EventFields(f -> false);
   }
 
-  /** Use this if you do want fields to be exported. This is potentially expensive! */
+  /** Use this if you do want all fields to be exported. This is potentially expensive! */
   public static EventFields all() {
     return new EventFields(f -> true);
   }
