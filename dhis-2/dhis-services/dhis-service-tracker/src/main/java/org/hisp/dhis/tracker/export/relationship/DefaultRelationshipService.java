@@ -78,11 +78,6 @@ public class DefaultRelationshipService implements RelationshipService {
           case RELATIONSHIP -> throw new IllegalArgumentException("Unsupported type");
         };
     return relationshipItems.stream()
-        // TODO(ivo) maybe push into the store
-        .filter(
-            ri ->
-                ri.getRelationship().getFrom().equals(ri)
-                    || ri.getRelationship().getRelationshipType().isBidirectional())
         .filter(
             ri ->
                 trackerAccessManager

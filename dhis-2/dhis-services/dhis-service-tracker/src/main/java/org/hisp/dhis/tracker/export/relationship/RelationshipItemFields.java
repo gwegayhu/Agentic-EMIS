@@ -12,7 +12,7 @@
  * this list of conditions and the following disclaimer in the documentation
  * and/or other materials provided with the distribution.
  *
- * 3. Neither the name of the copyright holder nor the names of its contributors
+ * 3. Neither the name of the copyright holder nor the names of its contributors 
  * may be used to endorse or promote products derived from this software without
  * specific prior written permission.
  *
@@ -110,7 +110,10 @@ public class RelationshipItemFields {
   public static class TrackedEntityFields {
     private final boolean includesAttributes;
     private final boolean includesEnrollments;
-    // TODO(ivo) should this even exist? how deep do we go? we do not want to include relationships, so if you take these away from EnrollmentFields EnrollmentFields is empty at which point we do not need it at all but a includesEnrollments is good enough without EnrollmentFields
+
+    // TODO(ivo) should this even exist? how deep do we go? we do not want to include relationships,
+    // so if you take these away from EnrollmentFields EnrollmentFields is empty at which point we
+    // do not need it at all but a includesEnrollments is good enough without EnrollmentFields
 
     private TrackedEntityFields(Predicate<String> includesFields, String pathSeparator) {
       this.includesAttributes = includesFields.test("attributes");
@@ -153,10 +156,11 @@ public class RelationshipItemFields {
   @ToString
   @EqualsAndHashCode
   public static class EventFields {
-    // TODO(ivo) should this even exist? how deep do we go? we do not want to include relationships, so if you take these away from EventFields EventFields is empty at which point we do not need it at all but a includesEvent is good enough without EventFields
+    // TODO(ivo) should this even exist? how deep do we go? we do not want to include relationships,
+    // so if you take these away from EventFields EventFields is empty at which point we do not need
+    // it at all but a includesEvent is good enough without EventFields
 
-    private EventFields(Predicate<String> includesFields) {
-    }
+    private EventFields(Predicate<String> includesFields) {}
 
     public static EventFields of(@Nonnull Predicate<String> includesFields) {
       return new EventFields(includesFields);

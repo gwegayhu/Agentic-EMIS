@@ -176,7 +176,11 @@ class HibernateRelationshipStore extends SoftDeleteHibernateObjectStore<Relation
     String hql =
         """
                 from RelationshipItem ri
-                where ri.trackedEntity.uid = :trackedEntity
+                inner join Relationship r
+                inner join RelationshipType rt
+                where
+                 (r.from = ri.id or rt.bidirectional = true)
+                 and ri.trackedEntity.uid = :trackedEntity
                 """;
     if (!includeDeleted) {
       hql += "and ri.relationship.deleted = false";
@@ -192,7 +196,11 @@ class HibernateRelationshipStore extends SoftDeleteHibernateObjectStore<Relation
     String hql =
         """
                 from RelationshipItem ri
-                where ri.enrollment.uid = :enrollment
+                inner join Relationship r
+                inner join RelationshipType rt
+                where
+                 (r.from = ri.id or rt.bidirectional = true)
+                 and ri.enrollment.uid = :enrollment
                 """;
     if (!includeDeleted) {
       hql += "and ri.relationship.deleted = false";
@@ -207,7 +215,11 @@ class HibernateRelationshipStore extends SoftDeleteHibernateObjectStore<Relation
     String hql =
         """
                 from RelationshipItem ri
-                where ri.event.uid = :event
+                inner join Relationship r
+                inner join RelationshipType rt
+                where
+                 (r.from = ri.id or rt.bidirectional = true)
+                  and ri.event.uid = :event
                 """;
     if (!includeDeleted) {
       hql += "and ri.relationship.deleted = false";
