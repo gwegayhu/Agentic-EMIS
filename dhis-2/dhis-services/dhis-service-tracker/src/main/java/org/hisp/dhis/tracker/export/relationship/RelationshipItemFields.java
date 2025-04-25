@@ -34,9 +34,6 @@ import javax.annotation.Nonnull;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
-import org.hisp.dhis.tracker.export.enrollment.EnrollmentFields;
-import org.hisp.dhis.tracker.export.event.EventFields;
-import org.hisp.dhis.tracker.export.trackedentity.TrackedEntityFields;
 
 /**
  * RelationshipItemFields indicates which of the relationship item fields should be exported. This
@@ -113,7 +110,7 @@ public class RelationshipItemFields {
   public static class TrackedEntityFields {
     private final boolean includesAttributes;
     private final boolean includesEnrollments;
-    // Add other fields as needed
+    // TODO(ivo) should this even exist? how deep do we go? we do not want to include relationships, so if you take these away from EnrollmentFields EnrollmentFields is empty at which point we do not need it at all but a includesEnrollments is good enough without EnrollmentFields
 
     private TrackedEntityFields(Predicate<String> includesFields, String pathSeparator) {
       this.includesAttributes = includesFields.test("attributes");
@@ -136,7 +133,6 @@ public class RelationshipItemFields {
   public static class EnrollmentFields {
     private final boolean includesEvents;
     private final boolean includesAttributes;
-    // Add other fields as needed
 
     private EnrollmentFields(Predicate<String> includesFields, String pathSeparator) {
       this.includesEvents = includesFields.test("events");
@@ -157,13 +153,9 @@ public class RelationshipItemFields {
   @ToString
   @EqualsAndHashCode
   public static class EventFields {
-    private final boolean includesNotes;
-    private final boolean includesDataValues;
-    // Add other fields as needed
+    // TODO(ivo) should this even exist? how deep do we go? we do not want to include relationships, so if you take these away from EventFields EventFields is empty at which point we do not need it at all but a includesEvent is good enough without EventFields
 
     private EventFields(Predicate<String> includesFields) {
-      this.includesNotes = includesFields.test("notes");
-      this.includesDataValues = includesFields.test("dataValues");
     }
 
     public static EventFields of(@Nonnull Predicate<String> includesFields) {
