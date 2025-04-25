@@ -78,6 +78,7 @@ public class DefaultRelationshipService implements RelationshipService {
           case RELATIONSHIP -> throw new IllegalArgumentException("Unsupported type");
         };
     return relationshipItems.stream()
+        // TODO(ivo) maybe push into the store
         .filter(
             ri ->
                 ri.getRelationship().getFrom().equals(ri)
@@ -87,6 +88,7 @@ public class DefaultRelationshipService implements RelationshipService {
                 trackerAccessManager
                     .canRead(CurrentUserUtil.getCurrentUserDetails(), ri.getRelationship())
                     .isEmpty())
+        // TODO(ivo) make mapper fields aware
         .map(RELATIONSHIP_ITEM_MAPPER::map)
         .collect(Collectors.toSet());
   }
