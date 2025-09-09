@@ -31,8 +31,10 @@ package org.hisp.dhis.dataset;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Optional;
 import org.hisp.dhis.category.CategoryOptionCombo;
 import org.hisp.dhis.dataelement.DataElementOperand;
+import org.hisp.dhis.feedback.ErrorMessage;
 import org.hisp.dhis.organisationunit.OrganisationUnit;
 import org.hisp.dhis.period.Period;
 
@@ -44,15 +46,18 @@ public interface CompleteDataSetRegistrationService {
    * Saves a CompleteDataSetRegistration.
    *
    * @param registration the CompleteDataSetRegistration to save.
+   * @return ImportSummary
    */
-  void saveCompleteDataSetRegistration(CompleteDataSetRegistration registration);
+  Optional<ErrorMessage> saveCompleteDataSetRegistration(CompleteDataSetRegistration registration);
 
   /**
    * Updates a CompleteDataSetRegistration.
    *
    * @param registration the CompleteDataSetRegistration to update.
+   * @return ImportSummary
    */
-  void updateCompleteDataSetRegistration(CompleteDataSetRegistration registration);
+  Optional<ErrorMessage> updateCompleteDataSetRegistration(
+      CompleteDataSetRegistration registration);
 
   /**
    * Retrieves the CompleteDataSetRegistration for the given DataSet, Period and Source.

@@ -29,11 +29,14 @@
  */
 package org.hisp.dhis.dataset;
 
+import static org.hisp.dhis.feedback.ErrorCode.E7605;
+
 import com.google.common.collect.Sets;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.hisp.dhis.category.CategoryOptionCombo;
@@ -46,6 +49,7 @@ import org.hisp.dhis.datavalue.AggregateAccessManager;
 import org.hisp.dhis.datavalue.DataExportParams;
 import org.hisp.dhis.datavalue.DataValueService;
 import org.hisp.dhis.datavalue.DeflatedDataValue;
+import org.hisp.dhis.feedback.ErrorMessage;
 import org.hisp.dhis.message.MessageService;
 import org.hisp.dhis.organisationunit.OrganisationUnit;
 import org.hisp.dhis.period.Period;
@@ -85,9 +89,11 @@ public class DefaultCompleteDataSetRegistrationService
 
   @Override
   @Transactional
-  public void saveCompleteDataSetRegistration(CompleteDataSetRegistration registration) {
+  public Optional<ErrorMessage> saveCompleteDataSetRegistration(
+      CompleteDataSetRegistration registration) {
     registration.setPeriod(periodStore.reloadForceAddPeriod(registration.getPeriod()));
-    checkCompulsoryDeOperands(registration);
+    Optional<ErrorMessage> errorMessage = checkCompulsoryDeOperands(registration);
+    if (errorMessage.isPresent()) return errorMessage;
 
     Date date = new Date();
 
@@ -118,6 +124,7 @@ public class DefaultCompleteDataSetRegistrationService
     }
 
     notificationEventPublisher.publishEvent(registration);
+    return Optional.empty();
   }
 
   /**
@@ -130,7 +137,8 @@ public class DefaultCompleteDataSetRegistrationService
    *
    * @param registration registration to check
    */
-  private void checkCompulsoryDeOperands(CompleteDataSetRegistration registration) {
+  public Optional<ErrorMessage> checkCompulsoryDeOperands(
+      CompleteDataSetRegistration registration) {
     // only get missing compulsory elements if they are actually compulsory
     if (registration.getDataSet().isCompulsoryFieldsCompleteOnly()) {
       List<DataElementOperand> missingDataElementOperands =
@@ -140,26 +148,29 @@ public class DefaultCompleteDataSetRegistrationService
               registration.getSource(),
               registration.getAttributeOptionCombo());
       if (!missingDataElementOperands.isEmpty()) {
-        String deos =
+        String missingDeos =
             missingDataElementOperands.stream()
                 .map(DataElementOperand::getDisplayName)
                 .collect(Collectors.joining(","));
-        throw new IllegalStateException(
-            "All compulsory data element operands need to be filled: [%s]".formatted(deos));
+        return Optional.of(new ErrorMessage(E7605, missingDeos));
       }
     }
+    return Optional.empty();
   }
 
   @Override
   @Transactional
-  public void updateCompleteDataSetRegistration(CompleteDataSetRegistration registration) {
-    checkCompulsoryDeOperands(registration);
+  public Optional<ErrorMessage> updateCompleteDataSetRegistration(
+      CompleteDataSetRegistration registration) {
+    Optional<ErrorMessage> errorMessage = checkCompulsoryDeOperands(registration);
+    if (errorMessage.isPresent()) return errorMessage;
 
     registration.setLastUpdated(new Date());
 
     registration.setLastUpdatedBy(CurrentUserUtil.getCurrentUsername());
 
     completeDataSetRegistrationStore.updateCompleteDataSetRegistration(registration);
+    return Optional.empty();
   }
 
   @Override
